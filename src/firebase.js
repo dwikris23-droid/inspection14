@@ -2,12 +2,12 @@ import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDRbtLQ8cDw936hT7-jd0RZWQoOA1-cI8U",
-  authDomain: "fabricaops.firebaseapp.com",
-  projectId: "fabricaops",
-  storageBucket: "fabricaops.firebasestorage.app",
-  messagingSenderId: "756784408812",
-  appId: "1:756784408812:web:fd3e4fe11f95f455861dc9"
+  apiKey: "AIzaSyAPfyqOdy8-KyNridJQa370rcZNA_7bGUw",
+  authDomain: "opsfabrica-452ba.firebaseapp.com",
+  projectId: "opsfabrica-452ba",
+  storageBucket: "opsfabrica-452ba.firebasestorage.app",
+  messagingSenderId: "609304735460",
+  appId: "1:609304735460:web:119f7ab2f15bec4f81c6f1"
 };
 
 const app = initializeApp(firebaseConfig);
