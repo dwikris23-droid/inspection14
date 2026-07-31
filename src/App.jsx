@@ -692,6 +692,77 @@ export default function App() {
     showToast('Filter rentang tanggal berhasil di-reset.');
   };
 
+  // ACTION: CREATE NEW PRODUCT TEMPLATE
+  const handleSaveNewProduct = (e) => {
+    e.preventDefault();
+    if (!newProductForm.id || !newProductForm.name) {
+      showToast('Harap isi ID dan Nama Produk Template!', 'error');
+      return;
+    }
+
+    setProductTemplates((prev) => [...prev, newProductForm]);
+    setSelectedProductTemplateId(newProductForm.id);
+    setIsAddProductModalOpen(false);
+    showToast(`Template produk ${newProductForm.name} berhasil dibuat!`);
+
+    // Reset Form
+    setNewProductForm({
+      id: '',
+      name: '',
+      category: 'Window Blinds',
+      unitDim: 'cm',
+      defaultL: 100,
+      defaultT: 150,
+      defaultP: 0,
+      defaultQ: 1,
+      bomFormulas: [
+        {
+          id: 'M1',
+          name: 'Bahan Utama',
+          unit: 'm²',
+          formula: '((L-2)*(T+10))/10000',
+          tolerancePct: 3,
+          note: 'Formula bahan utama',
+        },
+      ],
+      soDimensionSpecs: [
+        {
+          id: 'S1',
+          name: 'Lebar Akhir (L)',
+          targetFormula: 'L',
+          minTol: -0.2,
+          maxTol: 0.2,
+          unit: 'cm',
+        },
+      ],
+      estWasteStandardPct: 3.0,
+    });
+  };
+
+  // ACTION: EXPORT INSPECTIONS TO CSV
+  const handleExportCSV = () => {
+    if (filteredInspections.length === 0) {
+      showToast('Tidak ada data untuk diekspor!', 'error');
+      return;
+    }
+
+    let csvContent = 'data:text/csv;charset=utf-8,';
+    csvContent += 'ID Inspeksi,Tanggal,WO Number,SO Number,Customer,Produk,Status,Inspector\n';
+
+    filteredInspections.forEach((row) => {
+      csvContent += `"${row.id}","${row.date}","${row.woNumber}","${row.soNumber}","${row.customer}","${row.productName}","${row.overallStatus}","${row.inspector}"\n`;
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `QC_Report_${new Date().toISOString().substring(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('Data berhasil diekspor ke format CSV!');
+  };
+
   const calculatedTargetBom = useMemo(() => {
     if (!currentTemplate) return [];
     const params = {
@@ -1122,6 +1193,16 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans antialiased flex flex-col selection:bg-indigo-500 selection:text-white">
+      {/* CSS PRINT MEDIA STYLE */}
+      <style>{`
+        @media print {
+          .no-print, header, nav, button { display: none !important; }
+          body { background-color: white !important; color: black !important; }
+          .printable-modal-overlay { position: absolute !important; inset: 0 !important; background: white !important; p: 0 !important; }
+          .printable-document { border: none !important; box-shadow: none !important; }
+        }
+      `}</style>
+
       {/* Toast Alert */}
       {toastMessage && (
         <div
@@ -1551,7 +1632,7 @@ export default function App() {
 
                 <div className="p-6 rounded-2xl bg-slate-800 border border-slate-700 space-y-4">
                   <h3 className="font-bold text-white text-base">
-                    2. Audit Waste
+                    2. Audit Waste & Catatan Inspeksi
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -1580,6 +1661,18 @@ export default function App() {
                         required
                       />
                     </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-300 block mb-1">
+                      Catatan QC Inspeksi Tambahan:
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={inspectionNotes}
+                      onChange={(e) => setInspectionNotes(e.target.value)}
+                      placeholder="Masukkan catatan pendukung (opsional)..."
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                    />
                   </div>
                 </div>
 
@@ -1612,6 +1705,13 @@ export default function App() {
               </div>
 
               <div className="flex items-center space-x-3">
+                <button
+                  onClick={handleExportCSV}
+                  className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 flex items-center space-x-2 transition-all"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Ekspor CSV / Excel</span>
+                </button>
                 <button
                   onClick={triggerPrintSummaryReport}
                   className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 flex items-center space-x-2 transition-all"
@@ -1985,6 +2085,13 @@ export default function App() {
                   Formula & Editor BoM Custom
                 </h2>
               </div>
+              <button
+                onClick={() => setIsAddProductModalOpen(true)}
+                className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white font-bold text-xs rounded-xl flex items-center gap-2 shadow-lg transition-all"
+              >
+                <PlusCircle className="w-4 h-4" />
+                <span>Tambah Template Produk Baru</span>
+              </button>
             </div>
 
             <div className="space-y-6">
@@ -2091,6 +2198,132 @@ export default function App() {
         )}
       </main>
 
+      {/* MODAL VIEW INSPECTION DETAIL */}
+      {selectedInspection && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex justify-center items-center p-4">
+          <div className="bg-slate-800 border border-slate-700 text-white rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl relative">
+            <button
+              onClick={() => setSelectedInspection(null)}
+              className="absolute top-4 right-4 p-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center space-x-3 border-b border-slate-700 pb-3">
+              <ClipboardCheck className="w-6 h-6 text-indigo-400" />
+              <div>
+                <h3 className="font-bold text-lg">{selectedInspection.id}</h3>
+                <p className="text-xs text-slate-400">{selectedInspection.date} | {selectedInspection.inspector}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div><strong className="text-slate-400">WO / SO:</strong> {selectedInspection.woNumber} / {selectedInspection.soNumber}</div>
+              <div><strong className="text-slate-400">Customer:</strong> {selectedInspection.customer}</div>
+              <div className="col-span-2"><strong className="text-slate-400">Produk:</strong> {selectedInspection.productName}</div>
+              <div className="col-span-2"><strong className="text-slate-400">Catatan QC:</strong> {selectedInspection.statusReason}</div>
+            </div>
+
+            <div className="pt-2">
+              <h4 className="font-bold text-xs uppercase text-indigo-300 mb-2">Perbandingan BoM</h4>
+              <div className="bg-slate-900 rounded-xl p-3 max-h-48 overflow-y-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="text-slate-400 border-b border-slate-800">
+                    <tr>
+                      <th className="pb-1">Bahan</th>
+                      <th className="pb-1">Target</th>
+                      <th className="pb-1">Aktual</th>
+                      <th className="pb-1">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800 font-mono">
+                    {selectedInspection.bomComparison.map((m, idx) => (
+                      <tr key={idx}>
+                        <td className="py-1 font-sans">{m.materialName}</td>
+                        <td className="py-1">{m.planned} {m.unit}</td>
+                        <td className="py-1">{m.actual} {m.unit}</td>
+                        <td className="py-1">
+                          <span className={m.status === 'OK' ? 'text-emerald-400' : 'text-rose-400'}>{m.status}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL TAMBAH PRODUCT TEMPLATE BARU */}
+      {isAddProductModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex justify-center items-center p-4">
+          <form onSubmit={handleSaveNewProduct} className="bg-slate-800 border border-slate-700 text-white rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl relative">
+            <button
+              type="button"
+              onClick={() => setIsAddProductModalOpen(false)}
+              className="absolute top-4 right-4 p-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h3 className="font-bold text-lg flex items-center gap-2 text-indigo-400">
+              <PlusCircle className="w-5 h-5" /> Tambah Template Produk Custom Baru
+            </h3>
+
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div>
+                <label className="text-slate-400 block mb-1">ID Produk Custom (Unik):</label>
+                <input
+                  type="text"
+                  placeholder="misal: PROD-WOOD01"
+                  value={newProductForm.id}
+                  onChange={(e) => setNewProductForm({...newProductForm, id: e.target.value})}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white font-mono"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-slate-400 block mb-1">Kategori Produk:</label>
+                <input
+                  type="text"
+                  value={newProductForm.category}
+                  onChange={(e) => setNewProductForm({...newProductForm, category: e.target.value})}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white"
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="text-slate-400 block mb-1">Nama Deskripsi Produk:</label>
+                <input
+                  type="text"
+                  placeholder="misal: Wooden Blinds 50mm Premium Series"
+                  value={newProductForm.name}
+                  onChange={(e) => setNewProductForm({...newProductForm, name: e.target.value})}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end space-x-2">
+              <button
+                type="button"
+                onClick={() => setIsAddProductModalOpen(false)}
+                className="px-4 py-2 bg-slate-700 text-slate-300 text-xs rounded-xl font-bold"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded-xl font-bold shadow-lg"
+              >
+                Simpan Template Produk
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* MODAL PRINT PREVIEW */}
       {printPreviewModal.isOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex justify-center items-start overflow-y-auto p-4 printable-modal-overlay">
@@ -2166,6 +2399,22 @@ export default function App() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {printPreviewModal.type === 'SINGLE' && printPreviewModal.data && (
+                <div className="space-y-4">
+                  <h4 className="font-bold text-xs uppercase text-slate-800 border-b pb-1">
+                    Sertifikat Inspeksi QC #{printPreviewModal.data.id}
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div><strong>WO:</strong> {printPreviewModal.data.woNumber}</div>
+                    <div><strong>SO:</strong> {printPreviewModal.data.soNumber}</div>
+                    <div><strong>Customer:</strong> {printPreviewModal.data.customer}</div>
+                    <div><strong>Tanggal:</strong> {printPreviewModal.data.date}</div>
+                    <div><strong>Product:</strong> {printPreviewModal.data.productName}</div>
+                    <div><strong>Inspector:</strong> {printPreviewModal.data.inspector}</div>
+                  </div>
                 </div>
               )}
             </div>
