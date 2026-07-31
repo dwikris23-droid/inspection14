@@ -54,24 +54,22 @@ import {
   Download,
   Activity,
   HardDrive,
+  RotateCcw,
 } from 'lucide-react';
 
 // Dynamic Formula Evaluator Engine (Support L, T, P, Q and JS math operators)
 const evaluateFormula = (formulaStr, params) => {
   try {
     const { L = 0, T = 0, P = 0, Q = 1 } = params;
-    // Replace dimensions L, T, P, Q in formula string
     let expr = String(formulaStr)
       .replace(/\bL\b/gi, L)
       .replace(/\bT\b/gi, T)
       .replace(/\bP\b/gi, P)
       .replace(/\bQ\b/gi, Q);
 
-    // Sanitize string for safety before dynamic function execution
     const sanitized = expr.replace(/[^0-9\.\+\-\*\/\(\)\s\>\<\?\:\,\%]/g, '');
     if (!sanitized.trim()) return 0;
 
-    // Evaluate math expression using Math context
     const result = new Function('Math', `return (${sanitized});`)(Math);
     return isNaN(result) || !isFinite(result) ? 0 : Math.max(0, result);
   } catch (err) {
@@ -85,10 +83,10 @@ const INITIAL_PRODUCT_TEMPLATES = [
     id: 'PROD-RB01',
     name: 'Roller Blinds (RBO01 Blackout Series)',
     category: 'Window Blinds',
-    defaultL: 120, // Lebar in cm
-    defaultT: 200, // Tinggi in cm
+    defaultL: 120,
+    defaultT: 200,
     defaultP: 0,
-    defaultQ: 1, // Quantity in Set
+    defaultQ: 1,
     unitDim: 'cm',
     bomFormulas: [
       {
@@ -259,9 +257,9 @@ const INITIAL_PRODUCT_TEMPLATES = [
     id: 'PROD-BOX01',
     name: 'Custom Box Karton Flute (P x L x T)',
     category: 'Packaging',
-    defaultL: 30, // P in cm
-    defaultT: 20, // L in cm
-    defaultP: 15, // T in cm
+    defaultL: 30,
+    defaultT: 20,
+    defaultP: 15,
     defaultQ: 100,
     unitDim: 'cm',
     bomFormulas: [
@@ -568,7 +566,7 @@ const INITIAL_INSPECTIONS = [
 ];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('new_inspection'); // new_inspection, summary, dashboard, history, formulas
+  const [activeTab, setActiveTab] = useState('new_inspection');
   const [productTemplates, setProductTemplates] = useState(
     INITIAL_PRODUCT_TEMPLATES
   );
@@ -579,7 +577,7 @@ export default function App() {
   // PRINT / PDF PREVIEW MODAL STATE
   const [printPreviewModal, setPrintPreviewModal] = useState({
     isOpen: false,
-    type: 'SUMMARY', // 'SUMMARY' or 'SINGLE'
+    type: 'SUMMARY',
     data: null,
   });
 
@@ -587,8 +585,12 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
+  // RENTANG TANGGAL FILTER STATE
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
   // STEP WORKFLOW STATE IN NEW INSPECTION
-  const [inspectionStep, setInspectionStep] = useState(1); // 1: Input Specs & Calc BoM, 2: Input Field Actuals
+  const [inspectionStep, setInspectionStep] = useState(1);
 
   // Product Selection & Custom Dimensions State
   const [selectedProductTemplateId, setSelectedProductTemplateId] = useState(
@@ -605,10 +607,10 @@ export default function App() {
   );
 
   // Dimensions State
-  const [dimL, setDimL] = useState(120); // Lebar in cm
-  const [dimT, setDimT] = useState(200); // Tinggi in cm
-  const [dimP, setDimP] = useState(0); // Extra dimension if needed
-  const [dimQ, setDimQ] = useState(1); // Quantity
+  const [dimL, setDimL] = useState(120);
+  const [dimT, setDimT] = useState(200);
+  const [dimP, setDimP] = useState(0);
+  const [dimQ, setDimQ] = useState(1);
 
   // Field Actuals Inputs
   const [actualBomUsage, setActualBomUsage] = useState({});
@@ -651,7 +653,6 @@ export default function App() {
     estWasteStandardPct: 3.0,
   });
 
-  // Selected Product Template Object
   const currentTemplate = useMemo(() => {
     return (
       productTemplates.find((p) => p.id === selectedProductTemplateId) ||
@@ -664,7 +665,6 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Synchronize dimension defaults when template changes
   useEffect(() => {
     if (currentTemplate) {
       setDimL(currentTemplate.defaultL || 100);
@@ -674,7 +674,24 @@ export default function App() {
     }
   }, [selectedProductTemplateId, currentTemplate]);
 
-  // STEP 1: CALCULATE TARGET BOM FROM CUSTOM FORMULAS & DIMENSIONS
+  // ACTION: DELETE INSPECTION ITEM FROM HISTORY
+  const handleDeleteInspection = (id) => {
+    if (window.confirm(`Apakah Anda yakin ingin menghapus data inspeksi ${id}?`)) {
+      setInspections((prev) => prev.filter((item) => item.id !== id));
+      if (selectedInspection?.id === id) {
+        setSelectedInspection(null);
+      }
+      showToast(`Data inspeksi ${id} berhasil dihapus!`, 'error');
+    }
+  };
+
+  // ACTION: RESET DATE RANGE FILTER
+  const handleResetDateFilter = () => {
+    setStartDate('');
+    setEndDate('');
+    showToast('Filter rentang tanggal berhasil di-reset.');
+  };
+
   const calculatedTargetBom = useMemo(() => {
     if (!currentTemplate) return [];
     const params = {
@@ -697,7 +714,6 @@ export default function App() {
     });
   }, [currentTemplate, dimL, dimT, dimP, dimQ]);
 
-  // STEP 1: CALCULATE TARGET SO SPECIFICATIONS
   const calculatedTargetSpecs = useMemo(() => {
     if (!currentTemplate) return [];
     const params = {
@@ -716,7 +732,6 @@ export default function App() {
     });
   }, [currentTemplate, dimL, dimT, dimP, dimQ]);
 
-  // Sync actual inputs when moving to Step 2
   const syncDefaultsForStep2 = () => {
     const defaultBomActuals = {};
     calculatedTargetBom.forEach((item) => {
@@ -741,7 +756,6 @@ export default function App() {
     setActualWasteVal(estWaste);
   };
 
-  // EVALUATE AUDIT IN REAL TIME
   const auditEvaluation = useMemo(() => {
     if (!calculatedTargetBom.length) return null;
 
@@ -946,52 +960,7 @@ export default function App() {
     showToast('Komponen BoM dihapus!');
   };
 
-  const handleCreateNewProduct = (e) => {
-    e.preventDefault();
-    if (!newProductForm.name || !newProductForm.id) {
-      showToast('Harap isi ID dan Nama Produk!', 'error');
-      return;
-    }
-
-    setProductTemplates([...productTemplates, newProductForm]);
-    setSelectedProductTemplateId(newProductForm.id);
-    setIsAddProductModalOpen(false);
-    showToast(`Model produk baru "${newProductForm.name}" berhasil dibuat!`);
-
-    setNewProductForm({
-      id: '',
-      name: '',
-      category: 'Window Blinds',
-      unitDim: 'cm',
-      defaultL: 100,
-      defaultT: 150,
-      defaultP: 0,
-      defaultQ: 1,
-      bomFormulas: [
-        {
-          id: 'M1',
-          name: 'Bahan Utama',
-          unit: 'm²',
-          formula: '((L-2)*(T+10))/10000',
-          tolerancePct: 3,
-          note: 'Formula bahan utama',
-        },
-      ],
-      soDimensionSpecs: [
-        {
-          id: 'S1',
-          name: 'Lebar Akhir (L)',
-          targetFormula: 'L',
-          minTol: -0.2,
-          maxTol: 0.2,
-          unit: 'cm',
-        },
-      ],
-      estWasteStandardPct: 3.0,
-    });
-  };
-
-  // Filtered Inspections for History
+  // Filtered Inspections for History & Summary by Search, Status, and Date Range
   const filteredInspections = useMemo(() => {
     return inspections.filter((item) => {
       const matchesSearch =
@@ -999,34 +968,46 @@ export default function App() {
         item.woNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.productName.toLowerCase().includes(searchQuery.toLowerCase());
+
       const matchesStatus =
         statusFilter === 'ALL' || item.overallStatus === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
-  }, [inspections, searchQuery, statusFilter]);
 
-  // COMPUTE EXECUTIVE SUMMARY & AGGREGATED BOM REKAP DATA
+      // Extract date string "YYYY-MM-DD"
+      const itemDateStr = item.date.substring(0, 10);
+      let matchesDateRange = true;
+
+      if (startDate) {
+        matchesDateRange = matchesDateRange && itemDateStr >= startDate;
+      }
+      if (endDate) {
+        matchesDateRange = matchesDateRange && itemDateStr <= endDate;
+      }
+
+      return matchesSearch && matchesStatus && matchesDateRange;
+    });
+  }, [inspections, searchQuery, statusFilter, startDate, endDate]);
+
+  // COMPUTE EXECUTIVE SUMMARY & AGGREGATED BOM REKAP DATA BASED ON FILTERED INSPECTIONS
   const summaryMetrics = useMemo(() => {
-    const totalInspections = inspections.length;
+    const totalInspections = filteredInspections.length;
     if (totalInspections === 0) return null;
 
-    const passCount = inspections.filter(
+    const passCount = filteredInspections.filter(
       (i) => i.overallStatus === 'PASS'
     ).length;
-    const conditionalCount = inspections.filter(
+    const conditionalCount = filteredInspections.filter(
       (i) => i.overallStatus === 'CONDITIONAL'
     ).length;
-    const rejectCount = inspections.filter(
+    const rejectCount = filteredInspections.filter(
       (i) => i.overallStatus === 'REJECT'
     ).length;
     const passRate = ((passCount / totalInspections) * 100).toFixed(1);
 
-    // Aggregate Material Usage Across All Inspections
     const materialMap = {};
     let totalPlannedUnits = 0;
     let totalActualUnits = 0;
 
-    inspections.forEach((record) => {
+    filteredInspections.forEach((record) => {
       if (record.bomComparison && Array.isArray(record.bomComparison)) {
         record.bomComparison.forEach((mat) => {
           const key = `${mat.materialName} (${mat.unit})`;
@@ -1066,12 +1047,11 @@ export default function App() {
       };
     });
 
-    // Waste Summary
     let totalReportedWaste = 0;
     let totalActualWaste = 0;
     let totalDiscrepancies = 0;
 
-    inspections.forEach((r) => {
+    filteredInspections.forEach((r) => {
       if (r.wasteAudit) {
         totalReportedWaste += parseFloat(r.wasteAudit.reportedWaste) || 0;
         totalActualWaste += parseFloat(r.wasteAudit.actualMeasuredWaste) || 0;
@@ -1081,9 +1061,8 @@ export default function App() {
 
     const netWasteVariance = totalActualWaste - totalReportedWaste;
 
-    // Shift Performance Summary
     const shiftMap = {};
-    inspections.forEach((r) => {
+    filteredInspections.forEach((r) => {
       const s = r.shift || 'Shift 1 - Pagi';
       if (!shiftMap[s]) {
         shiftMap[s] = {
@@ -1117,9 +1096,8 @@ export default function App() {
       },
       shiftData,
     };
-  }, [inspections]);
+  }, [filteredInspections]);
 
-  // OPEN PRINT & PDF DIALOG
   const triggerPrintSummaryReport = () => {
     setPrintPreviewModal({
       isOpen: true,
@@ -1144,105 +1122,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans antialiased flex flex-col selection:bg-indigo-500 selection:text-white">
-      {/* INJECTED PRINT STYLESHEET FOR NATIVE BROWSER PDF & PRINTING */}
-      <style>{`
-        @media print {
-          /* Hide non-printable UI elements */
-          header, footer, nav, .no-print, button, .toast-notification, .modal-backdrop-blur {
-            display: none !important;
-          }
-
-          /* Force light theme & printable backgrounds */
-          body, html {
-            background-color: #ffffff !important;
-            color: #000000 !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            font-family: Arial, sans-serif !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-
-          /* Make print modal container full screen printable document */
-          .printable-modal-overlay {
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            height: auto !important;
-            background: #ffffff !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            box-shadow: none !important;
-            z-index: 99999 !important;
-          }
-
-          .printable-document {
-            background: #ffffff !important;
-            color: #000000 !important;
-            padding: 20px !important;
-            border: none !important;
-            box-shadow: none !important;
-            width: 100% !important;
-            max-width: 100% !important;
-          }
-
-          .printable-document * {
-            color: #000000 !important;
-            border-color: #cbd5e1 !important;
-          }
-
-          .printable-document table {
-            width: 100% !important;
-            border-collapse: collapse !important;
-            margin-top: 10px !important;
-          }
-
-          .printable-document th, .printable-document td {
-            border: 1px solid #94a3b8 !important;
-            padding: 6px 10px !important;
-            font-size: 11px !important;
-          }
-
-          .printable-document th {
-            background-color: #f1f5f9 !important;
-            font-weight: bold !important;
-          }
-
-          .badge-pass {
-            background-color: #d1fae5 !important;
-            color: #065f46 !important;
-            border: 1px solid #10b981 !important;
-            padding: 2px 8px !important;
-            border-radius: 4px !important;
-            font-weight: bold !important;
-          }
-
-          .badge-reject {
-            background-color: #ffe4e6 !important;
-            color: #9f1239 !important;
-            border: 1px solid #f43f5e !important;
-            padding: 2px 8px !important;
-            border-radius: 4px !important;
-            font-weight: bold !important;
-          }
-
-          .badge-cond {
-            background-color: #fef3c7 !important;
-            color: #92400e !important;
-            border: 1px solid #f59e0b !important;
-            padding: 2px 8px !important;
-            border-radius: 4px !important;
-            font-weight: bold !important;
-          }
-
-          .page-break-inside-avoid {
-            break-inside: avoid !important;
-            page-break-inside: avoid !important;
-          }
-        }
-      `}</style>
-
       {/* Toast Alert */}
       {toastMessage && (
         <div
@@ -1282,7 +1161,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Navigation Tabs */}
             <nav className="hidden md:flex items-center space-x-1">
               {[
                 {
@@ -1327,10 +1205,9 @@ export default function App() {
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 no-print">
-        {/* TAB 1: NEW INSPECTION & BOM CALCULATOR */}
+        {/* TAB 1: NEW INSPECTION */}
         {activeTab === 'new_inspection' && (
           <div className="space-y-6">
-            {/* Step Wizard Indicator Header */}
             <div className="p-6 rounded-2xl bg-slate-800 border border-slate-700 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -1343,7 +1220,6 @@ export default function App() {
                 </p>
               </div>
 
-              {/* Steps Progress */}
               <div className="flex items-center space-x-3 bg-slate-900/80 p-2 rounded-xl border border-slate-700">
                 <button
                   onClick={() => setInspectionStep(1)}
@@ -1378,23 +1254,14 @@ export default function App() {
               </div>
             </div>
 
-            {/* STEP 1: INPUT DIMENSI PRODUK CUSTOM & VIEW CALCULATED BOM */}
             {inspectionStep === 1 && (
               <div className="space-y-6 animate-fadeIn">
-                {/* Product Selection Card */}
                 <div className="p-6 rounded-2xl bg-slate-800 border border-slate-700 space-y-4">
                   <div className="flex justify-between items-center">
                     <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-2">
                       <Package className="w-4 h-4" /> Informasi Order & Model
                       Produk Custom
                     </h3>
-                    <button
-                      onClick={() => setIsAddProductModalOpen(true)}
-                      className="text-xs bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white px-3 py-1.5 rounded-lg font-bold border border-indigo-500/30 flex items-center gap-1 transition-all"
-                    >
-                      <PlusCircle className="w-3.5 h-3.5" /> Tambah Model Produk
-                      Baru
-                    </button>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1454,7 +1321,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* DYNAMIC DIMENSION INPUTS */}
                 <div className="p-6 rounded-2xl bg-gradient-to-r from-slate-800 to-indigo-950/40 border border-slate-700 space-y-4 shadow-lg">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1462,10 +1328,6 @@ export default function App() {
                         <Ruler className="w-5 h-5 text-indigo-400" /> Input
                         Dimensi Spesifikasi Produk (Ukuran SO)
                       </h3>
-                      <p className="text-xs text-slate-300 mt-0.5">
-                        Masukkan ukuran Lebar ($L$), Tinggi ($T$), dan Jumlah
-                        Order ($Q$). Sistem akan menghitung otomatis resep BoM.
-                      </p>
                     </div>
                     <span className="text-xs font-mono font-bold text-indigo-300 bg-indigo-500/20 px-3 py-1 rounded-full border border-indigo-500/30">
                       Satuan: {currentTemplate?.unitDim}
@@ -1482,7 +1344,7 @@ export default function App() {
                         step="any"
                         value={dimL}
                         onChange={(e) => setDimL(e.target.value)}
-                        className="w-full bg-slate-800 border-2 border-indigo-500/60 rounded-lg px-3 py-2 font-mono text-lg text-white font-bold focus:outline-none focus:border-indigo-400"
+                        className="w-full bg-slate-800 border-2 border-indigo-500/60 rounded-lg px-3 py-2 font-mono text-lg text-white font-bold focus:outline-none"
                         required
                       />
                     </div>
@@ -1496,7 +1358,7 @@ export default function App() {
                         step="any"
                         value={dimT}
                         onChange={(e) => setDimT(e.target.value)}
-                        className="w-full bg-slate-800 border-2 border-indigo-500/60 rounded-lg px-3 py-2 font-mono text-lg text-white font-bold focus:outline-none focus:border-indigo-400"
+                        className="w-full bg-slate-800 border-2 border-indigo-500/60 rounded-lg px-3 py-2 font-mono text-lg text-white font-bold focus:outline-none"
                         required
                       />
                     </div>
@@ -1531,40 +1393,23 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* CALCULATED BOM TABLE */}
                 <div className="p-6 rounded-2xl bg-slate-800 border border-slate-700 space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-700 pb-3">
-                    <div>
-                      <h3 className="font-bold text-white text-base flex items-center gap-2">
-                        <Sparkles className="w-5 h-5 text-indigo-400" /> Hasil
-                        Kalkulasi Otomatis BoM Standar
-                      </h3>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        Dihitung otomatis oleh rumus preset untuk produk{' '}
-                        <b>{currentTemplate?.name}</b> dengan ukuran{' '}
-                        <b>
-                          L: {dimL}cm x T: {dimT}cm (Qty: {dimQ})
-                        </b>
-                        .
-                      </p>
-                    </div>
-                    <span className="text-xs bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-3 py-1 rounded-full font-mono">
-                      System Calculated Target
-                    </span>
+                    <h3 className="font-bold text-white text-base flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-indigo-400" /> Hasil
+                      Kalkulasi Otomatis BoM Standar
+                    </h3>
                   </div>
 
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
                       <thead className="bg-slate-900/80 text-xs uppercase text-slate-400 border-b border-slate-700">
                         <tr>
-                          <th className="py-2.5 px-3">Komponen / Bahan Baku</th>
+                          <th className="py-2.5 px-3">Komponen / Bahan</th>
                           <th className="py-2.5 px-3">Rumus Formula Custom</th>
-                          <th className="py-2.5 px-3">
-                            Hasil Kalkulasi Target
-                          </th>
+                          <th className="py-2.5 px-3">Hasil Kalkulasi Target</th>
                           <th className="py-2.5 px-3">Satuan</th>
                           <th className="py-2.5 px-3">Toleransi Operasional</th>
-                          <th className="py-2.5 px-3">Keterangan</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-700/60 font-mono text-xs">
@@ -1584,9 +1429,6 @@ export default function App() {
                             </td>
                             <td className="py-3 px-3 text-slate-400">
                               ±{item.tolerancePct}%
-                            </td>
-                            <td className="py-3 px-3 text-slate-400 font-sans">
-                              {item.note}
                             </td>
                           </tr>
                         ))}
@@ -1610,7 +1452,6 @@ export default function App() {
               </div>
             )}
 
-            {/* STEP 2: INPUT ACTUAL USAGE IN FIELD */}
             {inspectionStep === 2 && (
               <form
                 onSubmit={handleSubmitInspection}
@@ -1618,20 +1459,13 @@ export default function App() {
               >
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-5 rounded-2xl bg-slate-800 border border-slate-700 text-xs">
                   <div>
-                    <span className="text-slate-400 block">
-                      Produk & Dimensi:
-                    </span>
+                    <span className="text-slate-400 block">Produk:</span>
                     <span className="font-bold text-white text-sm">
                       {currentTemplate?.name}
                     </span>
-                    <div className="text-indigo-400 font-mono font-semibold">
-                      L: {dimL}cm | T: {dimT}cm | Qty: {dimQ}
-                    </div>
                   </div>
                   <div>
-                    <span className="text-slate-400 block">
-                      Shift Kerja Operasional:
-                    </span>
+                    <span className="text-slate-400 block">Shift Kerja:</span>
                     <select
                       value={shiftInput}
                       onChange={(e) => setShiftInput(e.target.value)}
@@ -1643,9 +1477,7 @@ export default function App() {
                     </select>
                   </div>
                   <div>
-                    <span className="text-slate-400 block">
-                      Inspector / Penanggung Jawab QC:
-                    </span>
+                    <span className="text-slate-400 block">Inspector QC:</span>
                     <input
                       type="text"
                       value={inspectorInput}
@@ -1665,40 +1497,24 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 1. INPUT BOM REALISASI LAPANGAN */}
                 <div className="p-6 rounded-2xl bg-slate-800 border border-slate-700 space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-700 pb-3">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-7 h-7 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-sm">
-                        1
-                      </div>
-                      <h3 className="font-bold text-white text-base">
-                        Pemeriksaan Pemakaian Bahan Baku (Target BoM vs.
-                        Realisasi Lapangan)
-                      </h3>
-                    </div>
-                  </div>
-
+                  <h3 className="font-bold text-white text-base">
+                    1. Realisasi Pemakaian Bahan Baku
+                  </h3>
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
                       <thead className="bg-slate-900/80 text-xs uppercase text-slate-400 border-b border-slate-700">
                         <tr>
-                          <th className="py-2.5 px-3">Komponen / Bahan</th>
+                          <th className="py-2.5 px-3">Komponen</th>
                           <th className="py-2.5 px-3">Satuan</th>
-                          <th className="py-2.5 px-3">Target BoM Kalkulasi</th>
-                          <th className="py-2.5 px-3 w-40">
-                            Pemakaian Aktual Lapangan
-                          </th>
+                          <th className="py-2.5 px-3">Target BoM</th>
+                          <th className="py-2.5 px-3 w-40">Pemakaian Aktual</th>
                           <th className="py-2.5 px-3">Deviasi (%)</th>
-                          <th className="py-2.5 px-3">Status Pemakaian</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-700/60 text-xs">
                         {auditEvaluation?.bomDetails.map((item) => (
-                          <tr
-                            key={item.materialId}
-                            className="hover:bg-slate-750"
-                          >
+                          <tr key={item.materialId}>
                             <td className="py-3 px-3 font-semibold text-slate-200">
                               {item.materialName}
                             </td>
@@ -1724,35 +1540,7 @@ export default function App() {
                               />
                             </td>
                             <td className="py-3 px-3 font-mono font-bold">
-                              <span
-                                className={
-                                  item.devPct > 0
-                                    ? 'text-amber-400'
-                                    : item.devPct < 0
-                                    ? 'text-blue-400'
-                                    : 'text-slate-300'
-                                }
-                              >
-                                {item.devPct > 0
-                                  ? `+${item.devPct}%`
-                                  : `${item.devPct}%`}
-                              </span>
-                            </td>
-                            <td className="py-3 px-3">
-                              {item.status === 'OK' ? (
-                                <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                                  <Check className="w-3 h-3" /> Sesuai Toleransi
-                                </span>
-                              ) : item.status === 'EXCEEDED' ? (
-                                <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold">
-                                  <AlertTriangle className="w-3 h-3" /> Boros
-                                  (&gt;+{item.tolerancePct}%)
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                                  Kurang Pemakaian
-                                </span>
-                              )}
+                              {item.devPct}%
                             </td>
                           </tr>
                         ))}
@@ -1761,214 +1549,57 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 2. AUDIT WASTE */}
                 <div className="p-6 rounded-2xl bg-slate-800 border border-slate-700 space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-700 pb-3">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-sm">
-                        2
-                      </div>
-                      <h3 className="font-bold text-white text-base">
-                        Audit Discrepancy Waste Produksi
-                      </h3>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-900/60 p-4 rounded-xl border border-slate-700">
+                  <h3 className="font-bold text-white text-base">
+                    2. Audit Waste
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs font-semibold text-slate-300 block mb-1">
-                        1. Waste Dilaporkan Operator Shift
+                        Waste Operator:
                       </label>
                       <input
                         type="number"
                         step="any"
                         value={reportedWasteVal}
                         onChange={(e) => setReportedWasteVal(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono text-base focus:border-indigo-500"
-                        placeholder="0.00"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono"
                         required
                       />
                     </div>
-
                     <div>
                       <label className="text-xs font-semibold text-slate-300 block mb-1">
-                        2. Waste Terukur QC / Inspector (Fisik)
+                        Waste QC Terukur:
                       </label>
                       <input
                         type="number"
                         step="any"
                         value={actualWasteVal}
                         onChange={(e) => setActualWasteVal(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono text-base focus:border-indigo-500"
-                        placeholder="0.00"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono"
                         required
                       />
                     </div>
-
-                    <div className="flex flex-col justify-center bg-slate-800 p-3.5 rounded-xl border border-slate-700">
-                      <div className="text-xs text-slate-400 uppercase font-bold">
-                        Selisih Discrepancy Waste
-                      </div>
-                      <div className="flex items-baseline space-x-2 mt-1">
-                        <span
-                          className={`text-2xl font-black font-mono ${
-                            auditEvaluation?.wasteAudit.isDiscrepancy
-                              ? 'text-rose-400'
-                              : 'text-emerald-400'
-                          }`}
-                        >
-                          {auditEvaluation?.wasteAudit.diff > 0
-                            ? `+${auditEvaluation.wasteAudit.diff}`
-                            : auditEvaluation?.wasteAudit.diff}
-                        </span>
-                        <span className="text-xs font-mono text-slate-400">
-                          ({auditEvaluation?.wasteAudit.devPct}%)
-                        </span>
-                      </div>
-                    </div>
                   </div>
                 </div>
 
-                {/* 3. DIMENSI FISIK VS SO */}
-                <div className="p-6 rounded-2xl bg-slate-800 border border-slate-700 space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-700 pb-3">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-sm">
-                        3
-                      </div>
-                      <h3 className="font-bold text-white text-base">
-                        Pemeriksaan Ukuran Hasil Kerja vs. Target Sales Order
-                        (SO)
-                      </h3>
-                    </div>
-                  </div>
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                      <thead className="bg-slate-900/80 text-xs uppercase text-slate-400 border-b border-slate-700">
-                        <tr>
-                          <th className="py-2.5 px-3">Parameter Dimensi</th>
-                          <th className="py-2.5 px-3">Target SO</th>
-                          <th className="py-2.5 px-3">Batas Toleransi</th>
-                          <th className="py-2.5 px-3 w-40">Hasil Ukur Fisik</th>
-                          <th className="py-2.5 px-3">Kualifikasi</th>
-                          <th className="py-2.5 px-3">Keterangan</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-700/60 text-xs">
-                        {auditEvaluation?.specDetails.map((item) => (
-                          <tr key={item.specId} className="hover:bg-slate-750">
-                            <td className="py-3 px-3 font-semibold text-slate-200">
-                              {item.specName}
-                            </td>
-                            <td className="py-3 px-3 font-mono text-indigo-300 font-bold">
-                              {item.target} {item.unit}
-                            </td>
-                            <td className="py-3 px-3 font-mono text-slate-400 text-[11px]">
-                              {item.minAllowed} s/d {item.maxAllowed}{' '}
-                              {item.unit}
-                            </td>
-                            <td className="py-3 px-3">
-                              <input
-                                type="number"
-                                step="any"
-                                value={
-                                  actualDimensionsMeasured[item.specId] || ''
-                                }
-                                onChange={(e) =>
-                                  setActualDimensionsMeasured({
-                                    ...actualDimensionsMeasured,
-                                    [item.specId]: e.target.value,
-                                  })
-                                }
-                                className="w-full bg-slate-900 border border-slate-700 focus:border-indigo-500 rounded px-2.5 py-1.5 font-mono text-white text-sm font-bold"
-                                required
-                              />
-                            </td>
-                            <td className="py-3 px-3">
-                              {item.status === 'PASS' ? (
-                                <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-medium">
-                                  <CheckCircle className="w-3.5 h-3.5" /> LULUS
-                                  (PASS)
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold">
-                                  <XCircle className="w-3.5 h-3.5" /> CACAT
-                                  (FAIL)
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-3 px-3 text-slate-400">
-                              {item.remark}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* DECISION & SAVE */}
-                <div className="p-6 rounded-2xl bg-slate-800 border border-slate-700 space-y-4 shadow-2xl">
-                  <h3 className="font-bold text-white text-base flex items-center gap-2">
-                    <ShieldAlert className="w-5 h-5 text-indigo-400" /> Hasil
-                    Akhir Evaluasi Sistem & Rekomendasi Keputusan
-                  </h3>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="md:col-span-2 space-y-2">
-                      <label className="text-xs text-slate-300 font-semibold block">
-                        Catatan Kejadian / Persetujuan Supervisor:
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={inspectionNotes}
-                        onChange={(e) => setInspectionNotes(e.target.value)}
-                        placeholder="Masukkan catatan kendala mesin, dispensasi toleransi dari supervisor..."
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:border-indigo-500 focus:outline-none"
-                      />
-                    </div>
-
-                    <div className="p-4 rounded-xl bg-slate-900 border border-slate-700 flex flex-col justify-between">
-                      <div>
-                        <div className="text-xs text-slate-400 uppercase font-bold">
-                          Rekomendasi System:
-                        </div>
-                        <div
-                          className={`text-2xl font-black mt-1 tracking-wider ${
-                            auditEvaluation?.recommendedStatus === 'PASS'
-                              ? 'text-emerald-400'
-                              : auditEvaluation?.recommendedStatus === 'REJECT'
-                              ? 'text-rose-400'
-                              : 'text-amber-400'
-                          }`}
-                        >
-                          {auditEvaluation?.recommendedStatus}
-                        </div>
-                        <p className="text-xs text-slate-300 mt-2 leading-relaxed">
-                          {auditEvaluation?.autoReason}
-                        </p>
-                      </div>
-
-                      <button
-                        type="submit"
-                        className="mt-4 w-full py-3 px-4 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white font-bold text-sm shadow-lg shadow-indigo-500/25 transition-all flex items-center justify-center space-x-2"
-                      >
-                        <ClipboardCheck className="w-5 h-5" />
-                        <span>Simpan Hasil Inspeksi</span>
-                      </button>
-                    </div>
-                  </div>
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    className="py-3 px-6 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white font-bold text-sm shadow-lg shadow-indigo-500/25 transition-all flex items-center space-x-2"
+                  >
+                    <ClipboardCheck className="w-5 h-5" />
+                    <span>Simpan Hasil Inspeksi</span>
+                  </button>
                 </div>
               </form>
             )}
           </div>
         )}
 
-        {/* TAB 2: EXECUTIVE SUMMARY & REKAP LAPORAN */}
+        {/* TAB 2: SUMMARY & REKAP LAPORAN */}
         {activeTab === 'summary' && (
           <div className="space-y-6 animate-fadeIn">
-            {/* Top Summary Banner */}
             <div className="p-6 rounded-2xl bg-gradient-to-r from-slate-800 via-indigo-950/60 to-slate-800 border border-slate-700 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -1976,8 +1607,7 @@ export default function App() {
                   Rekapitulasi Laporan QC Operasional
                 </h2>
                 <p className="text-xs text-slate-300 mt-1">
-                  Akumulasi total konsumsi bahan baku (Plan BoM vs Realisasi),
-                  audit waste per shift, dan kualifikasi mutu produk.
+                  Akumulasi total konsumsi bahan baku dan audit waste berdasarkan filter rentang tanggal.
                 </p>
               </div>
 
@@ -1992,19 +1622,65 @@ export default function App() {
               </div>
             </div>
 
-            {/* KPI Executive Summary Cards */}
-            {summaryMetrics && (
+            {/* BARIS TRIGGER FILTER RENTANG TANGGAL */}
+            <div className="p-4 rounded-2xl bg-slate-800 border border-slate-700 flex flex-wrap items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-3 text-xs">
+                <div className="flex items-center space-x-2">
+                  <Calendar className="w-4 h-4 text-indigo-400" />
+                  <span className="font-semibold text-slate-300">
+                    Mulai Tanggal:
+                  </span>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white font-mono focus:border-indigo-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <span className="font-semibold text-slate-300">
+                    S/D Tanggal:
+                  </span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white font-mono focus:border-indigo-500 focus:outline-none"
+                  />
+                </div>
+
+                {/* TOMBOL TRIGGER RESET FILTER TANGGAL */}
+                {(startDate || endDate) && (
+                  <button
+                    onClick={handleResetDateFilter}
+                    className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 transition-all font-semibold"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Reset Filter</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="text-xs text-slate-400">
+                Menampilkan Data:{' '}
+                <strong className="text-white font-mono">
+                  {summaryMetrics?.totalInspections || 0}
+                </strong>{' '}
+                Item Inspeksi
+              </div>
+            </div>
+
+            {/* KPI Summary Cards */}
+            {summaryMetrics ? (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="p-5 rounded-2xl bg-slate-800 border border-slate-700 shadow-sm flex items-center justify-between">
                   <div>
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                      Total WO Diinspeksi
+                      Total Order
                     </span>
                     <div className="text-3xl font-black text-white mt-1">
-                      {summaryMetrics.totalInspections}{' '}
-                      <span className="text-xs font-normal text-slate-400">
-                        Order
-                      </span>
+                      {summaryMetrics.totalInspections}
                     </div>
                   </div>
                   <div className="p-3 bg-indigo-500/10 rounded-xl text-indigo-400 border border-indigo-500/20">
@@ -2015,15 +1691,11 @@ export default function App() {
                 <div className="p-5 rounded-2xl bg-slate-800 border border-slate-700 shadow-sm flex items-center justify-between">
                   <div>
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                      QC Pass Rate
+                      Pass Rate
                     </span>
                     <div className="text-3xl font-black text-emerald-400 mt-1">
                       {summaryMetrics.passRate}%
                     </div>
-                    <span className="text-[11px] text-slate-400">
-                      {summaryMetrics.passCount} dari{' '}
-                      {summaryMetrics.totalInspections} Lulus
-                    </span>
                   </div>
                   <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-400 border border-emerald-500/20">
                     <CheckCircle className="w-6 h-6" />
@@ -2033,14 +1705,11 @@ export default function App() {
                 <div className="p-5 rounded-2xl bg-slate-800 border border-slate-700 shadow-sm flex items-center justify-between">
                   <div>
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                      Order Reject / Cacat
+                      Order Reject
                     </span>
                     <div className="text-3xl font-black text-rose-400 mt-1">
                       {summaryMetrics.rejectCount}
                     </div>
-                    <span className="text-[11px] text-slate-400">
-                      Gagal spesifikasi SO
-                    </span>
                   </div>
                   <div className="p-3 bg-rose-500/10 rounded-xl text-rose-400 border border-rose-500/20">
                     <XCircle className="w-6 h-6" />
@@ -2053,225 +1722,83 @@ export default function App() {
                       Waste Discrepancy
                     </span>
                     <div className="text-3xl font-black text-amber-400 mt-1">
-                      {summaryMetrics.wasteSummary.discrepancyCount}{' '}
-                      <span className="text-xs font-normal text-slate-400">
-                        Kasus
-                      </span>
+                      {summaryMetrics.wasteSummary.discrepancyCount}
                     </div>
-                    <span className="text-[11px] text-slate-400">
-                      Net:{' '}
-                      {summaryMetrics.wasteSummary.netVariance > 0
-                        ? `+${summaryMetrics.wasteSummary.netVariance}`
-                        : summaryMetrics.wasteSummary.netVariance}
-                    </span>
                   </div>
                   <div className="p-3 bg-amber-500/10 rounded-xl text-amber-400 border border-amber-500/20">
                     <AlertTriangle className="w-6 h-6" />
                   </div>
                 </div>
               </div>
+            ) : (
+              <div className="p-8 text-center bg-slate-800 rounded-2xl border border-slate-700 text-slate-400">
+                Tidak ada data inspeksi dalam rentang tanggal yang dipilih.
+              </div>
             )}
 
-            {/* 1. TABLE: REKAP KONSUMSI BAHAN BAKU (PLAN VS ACTUAL AGGREGATED) */}
-            <div className="p-6 rounded-2xl bg-slate-800 border border-slate-700 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-700 pb-3">
-                <div>
-                  <h3 className="font-bold text-white text-base flex items-center gap-2">
-                    <Layers className="w-5 h-5 text-indigo-400" /> Rekapitulasi
-                    Akumulasi Pemakaian Bahan Baku (Target BoM vs Realisasi)
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Menampilkan akumulasi jumlah pemakaian bahan baku hasil
-                    kalkulasi rumus BoM dibanding realisasi fisik di lapangan.
-                  </p>
-                </div>
-                <span className="text-xs bg-slate-900 text-indigo-300 border border-slate-700 px-3 py-1 rounded-full font-mono">
-                  Aggregated BoM Summary
-                </span>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-900/90 text-xs uppercase text-slate-400 border-b border-slate-700">
-                    <tr>
-                      <th className="py-3 px-4">Nama Bahan / Komponen</th>
-                      <th className="py-3 px-4">Satuan</th>
-                      <th className="py-3 px-4 text-right">
-                        Total Plan BoM (Target)
-                      </th>
-                      <th className="py-3 px-4 text-right">
-                        Total Aktual Lapangan
-                      </th>
-                      <th className="py-3 px-4 text-right">
-                        Selisih (Variance)
-                      </th>
-                      <th className="py-3 px-4 text-right">Deviasi (%)</th>
-                      <th className="py-3 px-4 text-center">
-                        Status Pemakaian
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-700/60 font-mono text-xs">
-                    {summaryMetrics?.aggregatedMaterials.map((mat, idx) => (
-                      <tr key={idx} className="hover:bg-slate-750">
-                        <td className="py-3.5 px-4 font-sans font-bold text-white">
-                          {mat.name}
-                        </td>
-                        <td className="py-3.5 px-4 text-slate-400 font-sans">
-                          {mat.unit}
-                        </td>
-                        <td className="py-3.5 px-4 text-right text-indigo-300 font-bold">
-                          {mat.totalPlannedFormatted}
-                        </td>
-                        <td className="py-3.5 px-4 text-right font-bold text-white">
-                          {mat.totalActualFormatted}
-                        </td>
-                        <td
-                          className={`py-3.5 px-4 text-right font-bold ${
-                            mat.diffFormatted > 0
-                              ? 'text-rose-400'
-                              : mat.diffFormatted < 0
-                              ? 'text-blue-400'
-                              : 'text-emerald-400'
-                          }`}
-                        >
-                          {mat.diffFormatted > 0
-                            ? `+${mat.diffFormatted}`
-                            : mat.diffFormatted}
-                        </td>
-                        <td className="py-3.5 px-4 text-right font-bold">
-                          <span
-                            className={
-                              mat.devPctFormatted > 0
-                                ? 'text-amber-400'
-                                : 'text-emerald-400'
-                            }
-                          >
-                            {mat.devPctFormatted > 0
-                              ? `+${mat.devPctFormatted}%`
-                              : `${mat.devPctFormatted}%`}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 text-center font-sans">
-                          {mat.exceededCount > 0 ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                              <AlertTriangle className="w-3 h-3" />{' '}
-                              {mat.exceededCount}x Over-budget
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                              <Check className="w-3 h-3" /> Efisien / In-Budget
-                            </span>
-                          )}
-                        </td>
+            {/* REKAP TABLE */}
+            {summaryMetrics && (
+              <div className="p-6 rounded-2xl bg-slate-800 border border-slate-700 space-y-4">
+                <h3 className="font-bold text-white text-base">
+                  Rekapitulasi Akumulasi Bahan Baku
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-900/90 text-xs uppercase text-slate-400 border-b border-slate-700">
+                      <tr>
+                        <th className="py-3 px-4">Nama Bahan</th>
+                        <th className="py-3 px-4">Satuan</th>
+                        <th className="py-3 px-4 text-right">Total Target</th>
+                        <th className="py-3 px-4 text-right">Total Aktual</th>
+                        <th className="py-3 px-4 text-right">Selisih</th>
+                        <th className="py-3 px-4 text-right">Deviasi (%)</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* 2. SUMMARY SHIFT PERFORMANCE & REKAP DISCREPANCY WASTE */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Shift Performance Summary */}
-              <div className="p-6 rounded-2xl bg-slate-800 border border-slate-700 space-y-4">
-                <h3 className="font-bold text-white text-base flex items-center gap-2 border-b border-slate-700 pb-3">
-                  <Users className="w-5 h-5 text-indigo-400" /> Ringkasan
-                  Performa QC per Shift Kerja
-                </h3>
-
-                <div className="space-y-3">
-                  {summaryMetrics?.shiftData.map((s, idx) => (
-                    <div
-                      key={idx}
-                      className="p-4 rounded-xl bg-slate-900/80 border border-slate-700 flex justify-between items-center"
-                    >
-                      <div>
-                        <div className="font-bold text-white text-sm">
-                          {s.shift}
-                        </div>
-                        <div className="text-xs text-slate-400 mt-0.5">
-                          Total Inspeksi: {s.total} Order
-                        </div>
-                      </div>
-
-                      <div className="flex space-x-2 text-xs font-bold font-mono">
-                        <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 rounded-lg border border-emerald-500/30">
-                          PASS: {s.pass}
-                        </span>
-                        <span className="px-2.5 py-1 bg-amber-500/20 text-amber-300 rounded-lg border border-amber-500/30">
-                          COND: {s.conditional}
-                        </span>
-                        <span className="px-2.5 py-1 bg-rose-500/20 text-rose-300 rounded-lg border border-rose-500/30">
-                          REJ: {s.reject}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                    </thead>
+                    <tbody className="divide-y divide-slate-700/60 font-mono text-xs">
+                      {summaryMetrics.aggregatedMaterials.map((mat, idx) => (
+                        <tr key={idx} className="hover:bg-slate-750">
+                          <td className="py-3.5 px-4 font-sans font-bold text-white">
+                            {mat.name}
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-400 font-sans">
+                            {mat.unit}
+                          </td>
+                          <td className="py-3.5 px-4 text-right text-indigo-300 font-bold">
+                            {mat.totalPlannedFormatted}
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-bold text-white">
+                            {mat.totalActualFormatted}
+                          </td>
+                          <td
+                            className={`py-3.5 px-4 text-right font-bold ${
+                              mat.diffFormatted > 0
+                                ? 'text-rose-400'
+                                : 'text-emerald-400'
+                            }`}
+                          >
+                            {mat.diffFormatted > 0
+                              ? `+${mat.diffFormatted}`
+                              : mat.diffFormatted}
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-bold">
+                            {mat.devPctFormatted}%
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-
-              {/* Waste Discrepancy Rekap */}
-              <div className="p-6 rounded-2xl bg-slate-800 border border-slate-700 space-y-4">
-                <h3 className="font-bold text-white text-base flex items-center gap-2 border-b border-slate-700 pb-3">
-                  <Scissors className="w-5 h-5 text-amber-400" /> Ringkasan
-                  Audit Discrepancy Waste
-                </h3>
-
-                <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700 space-y-3 font-mono text-xs">
-                  <div className="flex justify-between py-2 border-b border-slate-800">
-                    <span className="text-slate-400 font-sans">
-                      Total Waste Dilaporkan Operator:
-                    </span>
-                    <span className="text-white font-bold">
-                      {summaryMetrics?.wasteSummary.totalReported} Unit
-                    </span>
-                  </div>
-                  <div className="flex justify-between py-2 border-b border-slate-800">
-                    <span className="text-slate-400 font-sans">
-                      Total Waste Terukur QC Fisik:
-                    </span>
-                    <span className="text-indigo-300 font-bold">
-                      {summaryMetrics?.wasteSummary.totalActual} Unit
-                    </span>
-                  </div>
-                  <div className="flex justify-between py-2 border-b border-slate-800">
-                    <span className="text-slate-400 font-sans">
-                      Akumulasi Selisih Discrepancy:
-                    </span>
-                    <span
-                      className={`font-bold ${
-                        summaryMetrics?.wasteSummary.netVariance > 0
-                          ? 'text-rose-400'
-                          : 'text-emerald-400'
-                      }`}
-                    >
-                      {summaryMetrics?.wasteSummary.netVariance > 0
-                        ? `+${summaryMetrics.wasteSummary.netVariance}`
-                        : summaryMetrics?.wasteSummary.netVariance}{' '}
-                      Unit
-                    </span>
-                  </div>
-                  <div className="flex justify-between py-2">
-                    <span className="text-slate-400 font-sans">
-                      Jumlah Kasus Selisih Tinggi (&gt;15%):
-                    </span>
-                    <span className="text-amber-400 font-bold">
-                      {summaryMetrics?.wasteSummary.discrepancyCount} Kejadian
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         )}
 
-        {/* TAB 3: DASHBOARD & KPI */}
+        {/* TAB 3: DASHBOARD */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6 animate-fadeIn">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="p-5 rounded-2xl bg-slate-800 border border-slate-700 shadow-sm">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <span className="text-xs font-semibold uppercase text-slate-400">
                   Total Inspeksi
                 </span>
                 <div className="text-3xl font-extrabold text-white mt-2">
@@ -2279,7 +1806,7 @@ export default function App() {
                 </div>
               </div>
               <div className="p-5 rounded-2xl bg-slate-800 border border-slate-700 shadow-sm">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <span className="text-xs font-semibold uppercase text-slate-400">
                   Pass Rate
                 </span>
                 <div className="text-3xl font-extrabold text-emerald-400 mt-2">
@@ -2287,7 +1814,7 @@ export default function App() {
                 </div>
               </div>
               <div className="p-5 rounded-2xl bg-slate-800 border border-slate-700 shadow-sm">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <span className="text-xs font-semibold uppercase text-slate-400">
                   Order Reject
                 </span>
                 <div className="text-3xl font-extrabold text-rose-400 mt-2">
@@ -2295,7 +1822,7 @@ export default function App() {
                 </div>
               </div>
               <div className="p-5 rounded-2xl bg-slate-800 border border-slate-700 shadow-sm">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <span className="text-xs font-semibold uppercase text-slate-400">
                   Waste Discrepancy
                 </span>
                 <div className="text-3xl font-extrabold text-amber-400 mt-2">
@@ -2306,11 +1833,11 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 4: RIWAYAT AUDIT */}
+        {/* TAB 4: RIWAYAT AUDIT (TAMBAH FITUR HAPUS ITEM & FILTER RENTANG TANGGAL) */}
         {activeTab === 'history' && (
           <div className="space-y-6 animate-fadeIn">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-slate-800 border border-slate-700">
-              <div className="relative w-full sm:w-80">
+            <div className="flex flex-col lg:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-slate-800 border border-slate-700">
+              <div className="relative w-full lg:w-72">
                 <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
                 <input
                   type="text"
@@ -2321,20 +1848,49 @@ export default function App() {
                 />
               </div>
 
-              <div className="flex items-center space-x-2">
-                <label className="text-xs text-slate-400 font-semibold">
-                  Status Filter:
-                </label>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-semibold focus:outline-none"
-                >
-                  <option value="ALL">Semua Status</option>
-                  <option value="PASS">PASS (Lulus)</option>
-                  <option value="CONDITIONAL">CONDITIONAL</option>
-                  <option value="REJECT">REJECT (Cacat)</option>
-                </select>
+              {/* FILTER RENTANG TANGGAL DI RIWAYAT */}
+              <div className="flex flex-wrap items-center gap-3 text-xs w-full lg:w-auto">
+                <div className="flex items-center space-x-1">
+                  <Calendar className="w-4 h-4 text-indigo-400" />
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white font-mono focus:outline-none text-xs"
+                    title="Tanggal Mulai"
+                  />
+                  <span className="text-slate-500">s/d</span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white font-mono focus:outline-none text-xs"
+                    title="Tanggal Selesai"
+                  />
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-semibold focus:outline-none"
+                  >
+                    <option value="ALL">Semua Status</option>
+                    <option value="PASS">PASS (Lulus)</option>
+                    <option value="CONDITIONAL">CONDITIONAL</option>
+                    <option value="REJECT">REJECT (Cacat)</option>
+                  </select>
+                </div>
+
+                {(startDate || endDate) && (
+                  <button
+                    onClick={handleResetDateFilter}
+                    className="p-1.5 bg-rose-600/20 hover:bg-rose-600 rounded-lg text-rose-300 hover:text-white transition-all"
+                    title="Reset Filter Tanggal"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -2350,53 +1906,76 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700/50 text-xs">
-                  {filteredInspections.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-750">
-                      <td className="py-3.5 px-4 font-mono font-bold text-indigo-300">
-                        {item.id}
-                      </td>
-                      <td className="py-3.5 px-4 font-bold text-white">
-                        {item.woNumber} - {item.customer}
-                      </td>
-                      <td className="py-3.5 px-4">{item.productName}</td>
-                      <td className="py-3.5 px-4 text-center font-bold">
-                        <span
-                          className={`px-2.5 py-1 rounded-full text-[11px] ${
-                            item.overallStatus === 'PASS'
-                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                              : item.overallStatus === 'REJECT'
-                              ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                              : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                          }`}
-                        >
-                          {item.overallStatus}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-right space-x-2">
-                        <button
-                          onClick={() => triggerPrintSingleInspection(item)}
-                          className="p-1.5 bg-indigo-600/30 hover:bg-indigo-600 rounded-lg text-indigo-300 hover:text-white transition-all"
-                          title="Cetak PDF Sertifikat QC"
-                        >
-                          <Printer className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => setSelectedInspection(item)}
-                          className="p-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-white transition-all"
-                          title="Lihat Detail"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
+                  {filteredInspections.length > 0 ? (
+                    filteredInspections.map((item) => (
+                      <tr key={item.id} className="hover:bg-slate-750">
+                        <td className="py-3.5 px-4 font-mono font-bold text-indigo-300">
+                          <div>{item.id}</div>
+                          <div className="text-[10px] text-slate-400 font-normal">
+                            {item.date}
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 font-bold text-white">
+                          {item.woNumber} - {item.customer}
+                        </td>
+                        <td className="py-3.5 px-4">{item.productName}</td>
+                        <td className="py-3.5 px-4 text-center font-bold">
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-[11px] ${
+                              item.overallStatus === 'PASS'
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                : item.overallStatus === 'REJECT'
+                                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            }`}
+                          >
+                            {item.overallStatus}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-right space-x-2">
+                          <button
+                            onClick={() => triggerPrintSingleInspection(item)}
+                            className="p-1.5 bg-indigo-600/30 hover:bg-indigo-600 rounded-lg text-indigo-300 hover:text-white transition-all"
+                            title="Cetak PDF Sertifikat QC"
+                          >
+                            <Printer className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setSelectedInspection(item)}
+                            className="p-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-white transition-all"
+                            title="Lihat Detail"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+
+                          {/* TOMBOL TRIGGER HAPUS ITEM HISTORI */}
+                          <button
+                            onClick={() => handleDeleteInspection(item.id)}
+                            className="p-1.5 bg-rose-600/20 hover:bg-rose-600 rounded-lg text-rose-300 hover:text-white border border-rose-500/30 transition-all"
+                            title="Hapus Record Inspeksi"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="py-8 text-center text-slate-400 italic"
+                      >
+                        Tidak ada riwayat data inspeksi yang ditemukan.
                       </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
         )}
 
-        {/* TAB 5: MASTER FORMULA & BOM EDITOR */}
+        {/* TAB 5: MASTER FORMULA EDITOR */}
         {activeTab === 'formulas' && (
           <div className="space-y-6 animate-fadeIn">
             <div className="p-6 rounded-2xl bg-slate-800 border border-slate-700 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -2405,35 +1984,7 @@ export default function App() {
                   <Settings className="w-6 h-6 text-indigo-400" /> Master
                   Formula & Editor BoM Custom
                 </h2>
-                <p className="text-xs text-slate-400 mt-1">
-                  Ubah rumus matematika, batas toleransi, atau tambah model
-                  produk baru secara langsung. Gunakan parameter:{' '}
-                  <code className="text-indigo-300 bg-slate-900 px-1 py-0.5 rounded">
-                    L
-                  </code>{' '}
-                  (Lebar),{' '}
-                  <code className="text-indigo-300 bg-slate-900 px-1 py-0.5 rounded">
-                    T
-                  </code>{' '}
-                  (Tinggi),{' '}
-                  <code className="text-indigo-300 bg-slate-900 px-1 py-0.5 rounded">
-                    P
-                  </code>{' '}
-                  (Panjang),{' '}
-                  <code className="text-indigo-300 bg-slate-900 px-1 py-0.5 rounded">
-                    Q
-                  </code>{' '}
-                  (Qty).
-                </p>
               </div>
-
-              <button
-                onClick={() => setIsAddProductModalOpen(true)}
-                className="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all"
-              >
-                <PlusCircle className="w-4 h-4" />
-                <span>+ Buat Model Produk Baru</span>
-              </button>
             </div>
 
             <div className="space-y-6">
@@ -2444,27 +1995,20 @@ export default function App() {
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-700 pb-3 gap-2">
                     <div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xs font-mono font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">
-                          {tmpl.id}
-                        </span>
-                        <span className="text-xs text-slate-400">
-                          Kategori: {tmpl.category}
-                        </span>
-                      </div>
+                      <span className="text-xs font-mono font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">
+                        {tmpl.id}
+                      </span>
                       <h3 className="font-bold text-white text-lg mt-0.5">
                         {tmpl.name}
                       </h3>
                     </div>
 
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => handleAddFormulaRow(tmpl.id)}
-                        className="text-xs bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white px-3 py-1.5 rounded-lg font-bold border border-emerald-500/30 flex items-center gap-1 transition-all"
-                      >
-                        <Plus className="w-3.5 h-3.5" /> Tambah Komponen Bahan
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => handleAddFormulaRow(tmpl.id)}
+                      className="text-xs bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white px-3 py-1.5 rounded-lg font-bold border border-emerald-500/30 flex items-center gap-1 transition-all"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Tambah Komponen Bahan
+                    </button>
                   </div>
 
                   <div className="overflow-x-auto">
@@ -2473,13 +2017,7 @@ export default function App() {
                         <tr>
                           <th className="py-2.5 px-3">Nama Bahan</th>
                           <th className="py-2.5 px-3">Satuan</th>
-                          <th className="py-2.5 px-3">
-                            Rumus Formula Custom (L, T, P, Q)
-                          </th>
-                          <th className="py-2.5 px-3 w-28">Toleransi (%)</th>
-                          <th className="py-2.5 px-3">
-                            Catatan Potong / Perakitan
-                          </th>
+                          <th className="py-2.5 px-3">Rumus Formula Custom</th>
                           <th className="py-2.5 px-3 text-right">Aksi</th>
                         </tr>
                       </thead>
@@ -2498,7 +2036,7 @@ export default function App() {
                                     e.target.value
                                   )
                                 }
-                                className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs font-semibold focus:border-indigo-500"
+                                className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs"
                               />
                             </td>
                             <td className="py-2.5 px-3 font-sans">
@@ -2513,7 +2051,7 @@ export default function App() {
                                     e.target.value
                                   )
                                 }
-                                className="w-20 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-indigo-300 text-xs font-bold focus:border-indigo-500"
+                                className="w-20 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-indigo-300 text-xs"
                               />
                             </td>
                             <td className="py-2.5 px-3">
@@ -2528,37 +2066,7 @@ export default function App() {
                                     e.target.value
                                   )
                                 }
-                                className="w-full bg-slate-900 border border-indigo-500/50 rounded px-2.5 py-1 text-emerald-400 font-mono text-xs font-bold focus:border-indigo-400"
-                              />
-                            </td>
-                            <td className="py-2.5 px-3">
-                              <input
-                                type="number"
-                                value={f.tolerancePct}
-                                onChange={(e) =>
-                                  handleUpdateFormulaItem(
-                                    tmpl.id,
-                                    f.id,
-                                    'tolerancePct',
-                                    parseFloat(e.target.value) || 0
-                                  )
-                                }
-                                className="w-16 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs text-center focus:border-indigo-500"
-                              />
-                            </td>
-                            <td className="py-2.5 px-3 font-sans">
-                              <input
-                                type="text"
-                                value={f.note}
-                                onChange={(e) =>
-                                  handleUpdateFormulaItem(
-                                    tmpl.id,
-                                    f.id,
-                                    'note',
-                                    e.target.value
-                                  )
-                                }
-                                className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-300 text-xs focus:border-indigo-500"
+                                className="w-full bg-slate-900 border border-indigo-500/50 rounded px-2.5 py-1 text-emerald-400 font-mono text-xs font-bold"
                               />
                             </td>
                             <td className="py-2.5 px-3 text-right">
@@ -2567,7 +2075,6 @@ export default function App() {
                                   handleDeleteFormulaRow(tmpl.id, f.id)
                                 }
                                 className="p-1 rounded bg-rose-500/20 hover:bg-rose-600 text-rose-300 hover:text-white transition-all"
-                                title="Hapus Komponen"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -2584,25 +2091,22 @@ export default function App() {
         )}
       </main>
 
-      {/* DEDICATED PRINT & EXPORT PDF PREVIEW MODAL */}
+      {/* MODAL PRINT PREVIEW */}
       {printPreviewModal.isOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex justify-center items-start overflow-y-auto p-4 printable-modal-overlay">
           <div className="bg-white text-slate-900 rounded-xl max-w-4xl w-full shadow-2xl overflow-hidden my-6 border border-slate-300 printable-document animate-fadeIn">
-            {/* Top Toolbar (Hidden on Print) */}
             <div className="bg-slate-900 text-white p-4 flex items-center justify-between no-print border-b border-slate-800">
               <div className="flex items-center space-x-2">
                 <Printer className="w-5 h-5 text-indigo-400" />
-                <span className="font-bold text-sm">
-                  Print & Export PDF Dokumen QC
-                </span>
+                <span className="font-bold text-sm">Print Dokumen QC</span>
               </div>
               <div className="flex items-center space-x-3">
                 <button
                   onClick={executeBrowserPrint}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg shadow flex items-center gap-2 transition-all"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg shadow flex items-center gap-2"
                 >
                   <Printer className="w-4 h-4" />
-                  <span>Cetak / Simpan PDF</span>
+                  <span>Cetak / PDF</span>
                 </button>
                 <button
                   onClick={() =>
@@ -2612,607 +2116,58 @@ export default function App() {
                       data: null,
                     })
                   }
-                  className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg transition-all"
+                  className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
-            {/* A4 PRINTABLE DOCUMENT BODY */}
             <div className="p-8 space-y-6">
-              {/* Document Header / Kop Surat */}
               <div className="border-b-2 border-slate-800 pb-4 flex justify-between items-end">
                 <div>
                   <h1 className="text-xl font-bold tracking-tight text-slate-900">
                     FABRICA INDONESIA
                   </h1>
                   <p className="text-xs text-slate-600">
-                    Sistem Inspeksi Operasional & Kalkulator BoM Custom
-                    (OP-INSPECT)
+                    Sistem Inspeksi QC & BoM Custom
                   </p>
-                  <p className="text-[11px] text-slate-500">
-                    Kawasan Industri Jababeka Phase III, Cikarang &bull; Telp:
-                    (021) 8983-2026
-                  </p>
-                </div>
-                <div className="text-right">
-                  <div className="inline-block px-3 py-1 bg-slate-100 border border-slate-300 rounded font-mono text-xs font-bold text-slate-800">
-                    {printPreviewModal.type === 'SUMMARY'
-                      ? 'REKAP_QC_SUMMARY'
-                      : printPreviewModal.data?.id}
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-1">
-                    Tanggal Cetak:{' '}
-                    {new Date().toLocaleDateString('id-ID', {
-                      day: '2-digit',
-                      month: 'long',
-                      year: 'numeric',
-                    })}
-                  </div>
                 </div>
               </div>
 
-              {/* PRINT TYPE 1: EXECUTIVE SUMMARY REPORT */}
               {printPreviewModal.type === 'SUMMARY' && summaryMetrics && (
-                <div className="space-y-6">
-                  <div className="text-center font-bold text-base text-slate-900 uppercase tracking-wide border-b border-slate-200 pb-2">
-                    LAPORAN REKAPITULASI INSPEKSI OPERASIONAL & AUDIT BOM
-                  </div>
-
-                  {/* Summary Metric Stats */}
-                  <div className="grid grid-cols-4 gap-4 text-xs text-center border border-slate-300 rounded-lg p-3 bg-slate-50">
-                    <div>
-                      <span className="text-slate-500 block text-[10px]">
-                        TOTAL INSPEKSI
-                      </span>
-                      <strong className="text-base font-extrabold text-slate-900">
-                        {summaryMetrics.totalInspections} Order
-                      </strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block text-[10px]">
-                        QC PASS RATE
-                      </span>
-                      <strong className="text-base font-extrabold text-emerald-700">
-                        {summaryMetrics.passRate}%
-                      </strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block text-[10px]">
-                        ORDER REJECT
-                      </span>
-                      <strong className="text-base font-extrabold text-rose-700">
-                        {summaryMetrics.rejectCount} Case
-                      </strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block text-[10px]">
-                        WASTE DISCREPANCY
-                      </span>
-                      <strong className="text-base font-extrabold text-amber-700">
-                        {summaryMetrics.wasteSummary.discrepancyCount} Kasus
-                      </strong>
-                    </div>
-                  </div>
-
-                  {/* Table Material Aggregated */}
-                  <div>
-                    <h4 className="font-bold text-xs uppercase mb-2 text-slate-800">
-                      1. Rekapitulasi Pemakaian Bahan Baku (Plan BoM vs
-                      Realisasi)
-                    </h4>
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr>
-                          <th>Nama Bahan Baku</th>
-                          <th>Satuan</th>
-                          <th className="text-right">Total Plan BoM</th>
-                          <th className="text-right">Total Aktual</th>
-                          <th className="text-right">Selisih</th>
-                          <th className="text-right">Deviasi (%)</th>
-                          <th className="text-center">Keterangan</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {summaryMetrics.aggregatedMaterials.map((mat, i) => (
-                          <tr key={i}>
-                            <td className="font-bold">{mat.name}</td>
-                            <td>{mat.unit}</td>
-                            <td className="text-right font-mono">
-                              {mat.totalPlannedFormatted}
-                            </td>
-                            <td className="text-right font-mono">
-                              {mat.totalActualFormatted}
-                            </td>
-                            <td
-                              className={`text-right font-mono font-bold ${
-                                mat.diffFormatted > 0
-                                  ? 'text-rose-700'
-                                  : 'text-slate-900'
-                              }`}
-                            >
-                              {mat.diffFormatted > 0
-                                ? `+${mat.diffFormatted}`
-                                : mat.diffFormatted}
-                            </td>
-                            <td className="text-right font-mono">
-                              {mat.devPctFormatted}%
-                            </td>
-                            <td className="text-center">
-                              {mat.exceededCount > 0
-                                ? 'Over-budget'
-                                : 'Efisien'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Waste Summary */}
-                  <div>
-                    <h4 className="font-bold text-xs uppercase mb-2 text-slate-800">
-                      2. Ringkasan Discrepancy Waste Produksi
-                    </h4>
-                    <div className="grid grid-cols-2 gap-4 text-xs border border-slate-300 rounded p-3">
-                      <div>
-                        Total Waste Dilaporkan Operator:{' '}
-                        <strong>
-                          {summaryMetrics.wasteSummary.totalReported} Unit
-                        </strong>
-                      </div>
-                      <div>
-                        Total Waste Terukur QC Fisik:{' '}
-                        <strong>
-                          {summaryMetrics.wasteSummary.totalActual} Unit
-                        </strong>
-                      </div>
-                      <div>
-                        Net Selisih Discrepancy:{' '}
-                        <strong className="text-rose-700">
-                          {summaryMetrics.wasteSummary.netVariance} Unit
-                        </strong>
-                      </div>
-                      <div>
-                        Jumlah Kasus Selisih Tinggi:{' '}
-                        <strong>
-                          {summaryMetrics.wasteSummary.discrepancyCount}{' '}
-                          Kejadian
-                        </strong>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* PRINT TYPE 2: SINGLE INSPECTION CERTIFICATE */}
-              {printPreviewModal.type === 'SINGLE' &&
-                printPreviewModal.data && (
-                  <div className="space-y-6">
-                    <div className="text-center font-bold text-base text-slate-900 uppercase tracking-wide border-b border-slate-200 pb-2">
-                      SERTIFIKAT HASIL INSPEKSI QUALITY CONTROL (QC RELEASE)
-                    </div>
-
-                    {/* Metadata */}
-                    <div className="grid grid-cols-2 gap-4 text-xs border border-slate-300 rounded p-3 bg-slate-50">
-                      <div>
-                        <div>
-                          <strong>No Inspeksi:</strong>{' '}
-                          {printPreviewModal.data.id}
-                        </div>
-                        <div>
-                          <strong>Work Order (WO):</strong>{' '}
-                          {printPreviewModal.data.woNumber}
-                        </div>
-                        <div>
-                          <strong>Sales Order (SO):</strong>{' '}
-                          {printPreviewModal.data.soNumber}
-                        </div>
-                        <div>
-                          <strong>Customer:</strong>{' '}
-                          {printPreviewModal.data.customer}
-                        </div>
-                      </div>
-                      <div>
-                        <div>
-                          <strong>Tanggal & Waktu:</strong>{' '}
-                          {printPreviewModal.data.date}
-                        </div>
-                        <div>
-                          <strong>Produk:</strong>{' '}
-                          {printPreviewModal.data.productName}
-                        </div>
-                        <div>
-                          <strong>Shift Kerja:</strong>{' '}
-                          {printPreviewModal.data.shift}
-                        </div>
-                        <div>
-                          <strong>Inspector QC:</strong>{' '}
-                          {printPreviewModal.data.inspector}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Status Box */}
-                    <div className="flex items-center justify-between p-3 border border-slate-400 rounded bg-slate-100">
-                      <span className="text-xs font-bold uppercase">
-                        STATUS LULUS QUALITY CONTROL:
-                      </span>
-                      <span
-                        className={`text-sm ${
-                          printPreviewModal.data.overallStatus === 'PASS'
-                            ? 'badge-pass'
-                            : printPreviewModal.data.overallStatus === 'REJECT'
-                            ? 'badge-reject'
-                            : 'badge-cond'
-                        }`}
-                      >
-                        {printPreviewModal.data.overallStatus}
-                      </span>
-                    </div>
-
-                    {/* Table Material Comparison */}
-                    <div>
-                      <h4 className="font-bold text-xs uppercase mb-2 text-slate-800">
-                        a. Hasil Audit Pemakaian Bahan Baku (BoM Calculator)
-                      </h4>
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr>
-                            <th>Nama Komponen / Bahan</th>
-                            <th>Satuan</th>
-                            <th className="text-right">Target BoM</th>
-                            <th className="text-right">Realisasi Lapangan</th>
-                            <th className="text-right">Deviasi (%)</th>
-                            <th className="text-center">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {printPreviewModal.data.bomComparison.map((b, i) => (
-                            <tr key={i}>
-                              <td className="font-bold">{b.materialName}</td>
-                              <td>{b.unit}</td>
-                              <td className="text-right font-mono">
-                                {b.planned}
-                              </td>
-                              <td className="text-right font-mono font-bold">
-                                {b.actual}
-                              </td>
-                              <td className="text-right font-mono">
-                                {b.devPct}%
-                              </td>
-                              <td className="text-center font-bold">
-                                {b.status}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Table SO Dimension Check */}
-                    <div>
-                      <h4 className="font-bold text-xs uppercase mb-2 text-slate-800">
-                        b. Hasil Ukur Dimensi Produk vs Spesifikasi Sales Order
-                      </h4>
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr>
-                            <th>Parameter Dimensi</th>
-                            <th className="text-right">Target SO</th>
-                            <th className="text-right">Hasil Ukur Fisik</th>
-                            <th className="text-center">Kualifikasi</th>
-                            <th>Keterangan</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {printPreviewModal.data.soDimensionCheck.map(
-                            (s, i) => (
-                              <tr key={i}>
-                                <td className="font-bold">{s.specName}</td>
-                                <td className="text-right font-mono">
-                                  {s.target} {s.unit}
-                                </td>
-                                <td className="text-right font-mono font-bold">
-                                  {s.actual} {s.unit}
-                                </td>
-                                <td className="text-center font-bold">
-                                  {s.status}
-                                </td>
-                                <td>{s.remark}</td>
-                              </tr>
-                            )
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Notes */}
-                    <div className="border border-slate-300 rounded p-3 text-xs bg-slate-50">
-                      <strong>Catatan / Justifikasi QC Inspector:</strong>
-                      <p className="mt-1 text-slate-700">
-                        {printPreviewModal.data.statusReason || '-'}
-                      </p>
-                    </div>
-
-                    {/* Signatures */}
-                    <div className="pt-6 grid grid-cols-2 gap-8 text-center text-xs page-break-inside-avoid">
-                      <div>
-                        <div className="text-slate-500 mb-12">
-                          QC Inspector / Officer
-                        </div>
-                        <div className="font-bold underline text-slate-800">
-                          ( {printPreviewModal.data.inspector} )
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-slate-500 mb-12">
-                          Production Supervisor
-                        </div>
-                        <div className="font-bold underline text-slate-800">
-                          ( Manager Produksi )
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* CREATE NEW PRODUCT MODEL MODAL */}
-      {isAddProductModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex justify-center items-center p-4">
-          <div className="bg-slate-800 border border-slate-700 rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl animate-fadeIn">
-            <div className="flex justify-between items-center border-b border-slate-700 pb-3">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <PlusCircle className="w-5 h-5 text-indigo-400" /> Buat Model
-                Produk Custom Baru
-              </h3>
-              <button
-                onClick={() => setIsAddProductModalOpen(false)}
-                className="text-slate-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateNewProduct} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">
-                    Kode ID Produk (Unik):
-                  </label>
-                  <input
-                    type="text"
-                    value={newProductForm.id}
-                    onChange={(e) =>
-                      setNewProductForm({
-                        ...newProductForm,
-                        id: e.target.value.toUpperCase(),
-                      })
-                    }
-                    placeholder="PROD-NEW01"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">
-                    Kategori Produk:
-                  </label>
-                  <input
-                    type="text"
-                    value={newProductForm.category}
-                    onChange={(e) =>
-                      setNewProductForm({
-                        ...newProductForm,
-                        category: e.target.value,
-                      })
-                    }
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs text-slate-400 block mb-1">
-                  Nama Model Produk:
-                </label>
-                <input
-                  type="text"
-                  value={newProductForm.name}
-                  onChange={(e) =>
-                    setNewProductForm({
-                      ...newProductForm,
-                      name: e.target.value,
-                    })
-                  }
-                  placeholder="Contoh: Venetian Blinds Aluminium 25mm"
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-bold"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">
-                    Default Lebar (L):
-                  </label>
-                  <input
-                    type="number"
-                    value={newProductForm.defaultL}
-                    onChange={(e) =>
-                      setNewProductForm({
-                        ...newProductForm,
-                        defaultL: parseFloat(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">
-                    Default Tinggi (T):
-                  </label>
-                  <input
-                    type="number"
-                    value={newProductForm.defaultT}
-                    onChange={(e) =>
-                      setNewProductForm({
-                        ...newProductForm,
-                        defaultT: parseFloat(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">
-                    Satuan Ukur:
-                  </label>
-                  <select
-                    value={newProductForm.unitDim}
-                    onChange={(e) =>
-                      setNewProductForm({
-                        ...newProductForm,
-                        unitDim: e.target.value,
-                      })
-                    }
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-bold"
-                  >
-                    <option value="cm">cm</option>
-                    <option value="mm">mm</option>
-                    <option value="m">m</option>
-                    <option value="inch">inch</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-slate-700 flex justify-end space-x-2">
-                <button
-                  type="button"
-                  onClick={() => setIsAddProductModalOpen(false)}
-                  className="px-4 py-2 bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg shadow-lg shadow-indigo-600/30"
-                >
-                  Simpan Produk Baru
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* VIEW SINGLE INSPECTION DETAILS MODAL */}
-      {selectedInspection && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex justify-center items-center p-4">
-          <div className="bg-slate-800 border border-slate-700 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl animate-fadeIn max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b border-slate-700 pb-3">
-              <div>
-                <span className="text-xs font-mono font-bold text-indigo-400">
-                  {selectedInspection.id}
-                </span>
-                <h3 className="text-base font-bold text-white">
-                  Detail Audit Inspeksi QC - {selectedInspection.woNumber}
-                </h3>
-              </div>
-              <button
-                onClick={() => setSelectedInspection(null)}
-                className="text-slate-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-700">
-                <div>
-                  <span className="text-slate-400">Customer:</span>{' '}
-                  <strong className="text-white">
-                    {selectedInspection.customer}
-                  </strong>
-                </div>
-                <div>
-                  <span className="text-slate-400">Produk:</span>{' '}
-                  <strong className="text-white">
-                    {selectedInspection.productName}
-                  </strong>
-                </div>
-                <div>
-                  <span className="text-slate-400">Tanggal:</span>{' '}
-                  <span className="text-slate-200">
-                    {selectedInspection.date}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400">Status QC:</span>{' '}
-                  <span
-                    className={`font-bold px-2 py-0.5 rounded text-[10px] ${
-                      selectedInspection.overallStatus === 'PASS'
-                        ? 'bg-emerald-500/20 text-emerald-300'
-                        : selectedInspection.overallStatus === 'REJECT'
-                        ? 'bg-rose-500/20 text-rose-300'
-                        : 'bg-amber-500/20 text-amber-300'
-                    }`}
-                  >
-                    {selectedInspection.overallStatus}
-                  </span>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="font-bold text-slate-300 uppercase mb-1">
-                  Koreksi Pemakaian BoM:
-                </h4>
-                <div className="bg-slate-900 rounded-lg p-2 border border-slate-700">
-                  <table className="w-full text-left">
+                <div className="space-y-4">
+                  <h4 className="font-bold text-xs uppercase text-slate-800">
+                    Rekapitulasi Inspeksi QC
+                  </h4>
+                  <table className="w-full text-xs">
                     <thead>
-                      <tr className="text-slate-400 border-b border-slate-800">
-                        <th className="py-1">Material</th>
-                        <th className="py-1">Plan</th>
-                        <th className="py-1">Actual</th>
-                        <th className="py-1">Deviasi</th>
+                      <tr>
+                        <th>Bahan Baku</th>
+                        <th>Satuan</th>
+                        <th className="text-right">Total Target</th>
+                        <th className="text-right">Total Aktual</th>
+                        <th className="text-right">Selisih</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800">
-                      {selectedInspection.bomComparison.map((m, i) => (
+                    <tbody>
+                      {summaryMetrics.aggregatedMaterials.map((mat, i) => (
                         <tr key={i}>
-                          <td className="py-1 text-slate-200">
-                            {m.materialName}
+                          <td className="font-bold">{mat.name}</td>
+                          <td>{mat.unit}</td>
+                          <td className="text-right font-mono">
+                            {mat.totalPlannedFormatted}
                           </td>
-                          <td className="py-1 font-mono">{m.planned}</td>
-                          <td className="py-1 font-mono font-bold">
-                            {m.actual}
+                          <td className="text-right font-mono">
+                            {mat.totalActualFormatted}
                           </td>
-                          <td className="py-1 font-mono">{m.devPct}%</td>
+                          <td className="text-right font-mono">{mat.diffFormatted}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              </div>
-
-              <div className="pt-2 flex justify-end space-x-2">
-                <button
-                  onClick={() => {
-                    const item = selectedInspection;
-                    setSelectedInspection(null);
-                    triggerPrintSingleInspection(item);
-                  }}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg flex items-center gap-2"
-                >
-                  <Printer className="w-4 h-4" /> Cetak Dokumen Sertifikat PDF
-                </button>
-              </div>
+              )}
             </div>
           </div>
         </div>
