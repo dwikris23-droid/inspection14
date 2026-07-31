@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
 
+console.log("Firebase App Name:", app.name); // Harusnya muncul "[DEFAULT]" di Browser Console
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <App />
