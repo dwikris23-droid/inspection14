@@ -107,7 +107,7 @@ export default function App() {
   const [shiftInput, setShiftInput] = useState('Shift 1 - Pagi');
   const [inspectorInput, setInspectorInput] = useState('');
 
-  // Dimensions State
+  // Dimensions State (Dimensi P, L, T, Q Kembali Lengkap)
   const [dimL, setDimL] = useState(100);
   const [dimT, setDimT] = useState(100);
   const [dimP, setDimP] = useState(0);
@@ -146,6 +146,14 @@ export default function App() {
         id: 'S1',
         name: 'Lebar Akhir (L)',
         targetFormula: 'L',
+        minTol: -0.2,
+        maxTol: 0.2,
+        unit: 'cm',
+      },
+      {
+        id: 'S2',
+        name: 'Panjang Akhir (P)',
+        targetFormula: 'P',
         minTol: -0.2,
         maxTol: 0.2,
         unit: 'cm',
@@ -215,7 +223,7 @@ export default function App() {
         if (selectedInspection?.docId === docId) {
           setSelectedInspection(null);
         }
-        showToast(`Data inspeksi berhasil dihapus dari Firestore!`, 'error');
+        showToast(`Data inspeksi berhasil dihapus!`, 'error');
       } catch (err) {
         showToast(`Gagal menghapus data: ${err.message}`, 'error');
       }
@@ -237,8 +245,9 @@ export default function App() {
 
     try {
       await addDoc(collection(db, 'productTemplates'), newProductForm);
+      // PERBAIKAN: AUTO CLOSE POPUP & NOTIFIKASI BERHASIL
       setIsAddProductModalOpen(false);
-      showToast(`Template produk ${newProductForm.name} berhasil tersimpan ke Firestore!`);
+      showToast(`Template produk ${newProductForm.name} berhasil disimpan!`);
 
       setNewProductForm({
         customId: '',
@@ -264,6 +273,14 @@ export default function App() {
             id: 'S1',
             name: 'Lebar Akhir (L)',
             targetFormula: 'L',
+            minTol: -0.2,
+            maxTol: 0.2,
+            unit: 'cm',
+          },
+          {
+            id: 'S2',
+            name: 'Panjang Akhir (P)',
+            targetFormula: 'P',
             minTol: -0.2,
             maxTol: 0.2,
             unit: 'cm',
@@ -480,7 +497,7 @@ export default function App() {
       woNumber: woNumberInput,
       soNumber: soNumberInput,
       customer: customerInput,
-      productName: `${currentTemplate.name} (L:${dimL} T:${dimT} ${currentTemplate.unitDim})`,
+      productName: `${currentTemplate.name} (P:${dimP} L:${dimL} T:${dimT} ${currentTemplate.unitDim})`,
       dimInput: {
         L: dimL,
         T: dimT,
@@ -513,8 +530,9 @@ export default function App() {
 
     try {
       await addDoc(collection(db, 'inspections'), newInspectionRecord);
+      // PERBAIKAN: NOTIFIKASI "BERHASIL DISIMPAN"
       showToast(
-        `Inspeksi ${newInspectionRecord.id} tersimpan di Firestore! Status: ${newInspectionRecord.overallStatus}`,
+        `Hasil Inspeksi ${newInspectionRecord.id} berhasil disimpan!`,
         newInspectionRecord.overallStatus === 'PASS' ? 'success' : 'error'
       );
       setInspectionStep(1);
@@ -537,7 +555,7 @@ export default function App() {
       await updateDoc(doc(db, 'productTemplates', tmplDocId), {
         bomFormulas: updatedBom,
       });
-      showToast('Rumus BoM tersimpan di Firestore!');
+      showToast('Rumus BoM berhasil disimpan!');
     } catch (err) {
       showToast(`Gagal update formula: ${err.message}`, 'error');
     }
@@ -561,7 +579,7 @@ export default function App() {
       await updateDoc(doc(db, 'productTemplates', tmplDocId), {
         bomFormulas: [...(tmpl.bomFormulas || []), newRow],
       });
-      showToast('Komponen BoM baru ditambahkan!');
+      showToast('Komponen BoM baru berhasil disimpan!');
     } catch (err) {
       showToast(`Gagal menambah komponen: ${err.message}`, 'error');
     }
@@ -577,7 +595,7 @@ export default function App() {
       await updateDoc(doc(db, 'productTemplates', tmplDocId), {
         bomFormulas: updatedBom,
       });
-      showToast('Komponen BoM dihapus!');
+      showToast('Komponen BoM berhasil dihapus!');
     } catch (err) {
       showToast(`Gagal menghapus komponen: ${err.message}`, 'error');
     }
@@ -929,7 +947,21 @@ export default function App() {
                         </span>
                       </div>
 
+                      {/* PERBAIKAN: INSPEKSI UKURAN P, L, T DITAMPILKAN KEMBALI SECARA PENUH */}
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-900/80 p-4 rounded-xl border border-slate-700">
+                        <div>
+                          <label className="text-xs font-bold text-indigo-300 block mb-1">
+                            Panjang (P) [{currentTemplate?.unitDim}]
+                          </label>
+                          <input
+                            type="number"
+                            step="any"
+                            value={dimP}
+                            onChange={(e) => setDimP(e.target.value)}
+                            className="w-full bg-slate-800 border-2 border-indigo-500/60 rounded-lg px-3 py-2 font-mono text-lg text-white font-bold focus:outline-none"
+                          />
+                        </div>
+
                         <div>
                           <label className="text-xs font-bold text-indigo-300 block mb-1">
                             Lebar (L) [{currentTemplate?.unitDim}]
@@ -957,21 +989,6 @@ export default function App() {
                             required
                           />
                         </div>
-
-                        {(currentTemplate?.customId?.includes('BOX') || dimP > 0) && (
-                          <div>
-                            <label className="text-xs font-bold text-indigo-300 block mb-1">
-                              Panjang (P) [{currentTemplate?.unitDim}]
-                            </label>
-                            <input
-                              type="number"
-                              step="any"
-                              value={dimP}
-                              onChange={(e) => setDimP(e.target.value)}
-                              className="w-full bg-slate-800 border-2 border-indigo-500/60 rounded-lg px-3 py-2 font-mono text-lg text-white font-bold focus:outline-none"
-                            />
-                          </div>
-                        )}
 
                         <div>
                           <label className="text-xs font-bold text-emerald-400 block mb-1">
@@ -1627,7 +1644,7 @@ export default function App() {
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div><strong className="text-slate-400">WO / SO:</strong> {selectedInspection.woNumber} / {selectedInspection.soNumber}</div>
               <div><strong className="text-slate-400">Customer:</strong> {selectedInspection.customer}</div>
-              <div className="col-span-2"><strong className="text-slate-400">Produk:</strong> {selectedInspection.productName}</div>
+              <div className="col-span-2"><strong className="text-slate-400">Produk & Ukuran:</strong> {selectedInspection.productName}</div>
               <div className="col-span-2"><strong className="text-slate-400">Catatan QC:</strong> {selectedInspection.statusReason}</div>
             </div>
 
@@ -1662,7 +1679,7 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL TAMBAH PRODUCT TEMPLATE BARU */}
+      {/* MODAL TAMBAH PRODUCT TEMPLATE BARU (AUTO CLOSE SETELAH SIMPAN) */}
       {isAddProductModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex justify-center items-center p-4 no-print">
           <form onSubmit={handleSaveNewProduct} className="bg-slate-800 border border-slate-700 text-white rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl relative">
@@ -1830,15 +1847,24 @@ export default function App() {
                 </div>
               )}
 
-              {/* MODEL TEMPLATE 2: SERTIFIKAT SINGLE INSPECTION */}
+              {/* MODEL TEMPLATE 2: SERTIFIKAT SINGLE INSPECTION (UKURAN PRODUK DITAMPILKAN DI SINI) */}
               {printPreviewModal.type === 'SINGLE' && printPreviewModal.data && (
                 <div className="space-y-6">
                   <div className="flex justify-between items-start bg-slate-50 p-4 rounded-lg border border-slate-200">
                     <div className="space-y-1 text-xs">
                       <div><strong className="text-slate-600">ID Inspeksi:</strong> <span className="font-mono font-bold text-slate-900">{printPreviewModal.data.id || printPreviewModal.data.docId}</span></div>
-                      <div><strong className="text-slate-600">Work Order (WO):</strong> {printPreviewModal.data.woNumber}</div>
-                      <div><strong className="text-slate-600">Sales Order (SO):</strong> {printPreviewModal.data.soNumber}</div>
-                      <div><strong className="text-slate-600">Customer:</strong> {printPreviewModal.data.customer}</div>
+                      <div><strong className="text-slate-600">Work Order (WO):</strong> {printPreviewModal.data.woNumber || '-'}</div>
+                      <div><strong className="text-slate-600">Sales Order (SO):</strong> {printPreviewModal.data.soNumber || '-'}</div>
+                      <div><strong className="text-slate-600">Customer:</strong> {printPreviewModal.data.customer || '-'}</div>
+                      {/* PERBAIKAN: UKURAN / SPESIFIKASI DITAMPILKAN DI LAPORAN PDF */}
+                      <div className="pt-1">
+                        <strong className="text-slate-600">Spesifikasi Ukuran:</strong>{' '}
+                        <span className="font-mono text-indigo-700 font-bold">
+                          {printPreviewModal.data.dimInput 
+                            ? `P: ${printPreviewModal.data.dimInput.P || 0} | L: ${printPreviewModal.data.dimInput.L || 0} | T: ${printPreviewModal.data.dimInput.T || 0} ${printPreviewModal.data.dimInput.unitDim || 'cm'} (Qty: ${printPreviewModal.data.dimInput.Q || 1})`
+                            : printPreviewModal.data.productName}
+                        </span>
+                      </div>
                     </div>
                     <div className="text-right text-xs space-y-1">
                       <div><strong className="text-slate-600">Tanggal:</strong> {printPreviewModal.data.date}</div>
