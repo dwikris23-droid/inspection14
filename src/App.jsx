@@ -2593,7 +2593,7 @@ export default function App() {
               <div className="flex items-center space-x-2">
                 <Printer className="w-5 h-5 text-indigo-400" />
                 <span className="font-bold text-sm">
-                  Prinj & Export PDF Dokumen QC
+                  Print & Export PDF Dokumen QC
                 </span>
               </div>
               <div className="flex items-center space-x-3">
@@ -2791,7 +2791,7 @@ export default function App() {
                 printPreviewModal.data && (
                   <div className="space-y-6">
                     <div className="text-center font-bold text-base text-slate-900 uppercase tracking-wide border-b border-slate-200 pb-2">
-                      SER TIFIKAT HASIL INSPEKSI QUALITY CONTROL (QC RELEASE)
+                      SERTIFIKAT HASIL INSPEKSI QUALITY CONTROL (QC RELEASE)
                     </div>
 
                     {/* Metadata */}
@@ -2882,26 +2882,28 @@ export default function App() {
                               <td className="text-right font-mono">
                                 {b.devPct}%
                               </td>
-                              <td className="text-center">{b.status}</td>
+                              <td className="text-center font-bold">
+                                {b.status}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
 
-                    {/* Table Dimensions */}
+                    {/* Table SO Dimension Check */}
                     <div>
                       <h4 className="font-bold text-xs uppercase mb-2 text-slate-800">
-                        b. Hasil Pengukuran Dimensi Fisik vs Target SO
+                        b. Hasil Ukur Dimensi Produk vs Spesifikasi Sales Order
                       </h4>
                       <table className="w-full text-xs">
                         <thead>
                           <tr>
-                            <th>Parameter Ukur</th>
+                            <th>Parameter Dimensi</th>
                             <th className="text-right">Target SO</th>
-                            <th className="text-right">Batas Toleransi</th>
                             <th className="text-right">Hasil Ukur Fisik</th>
                             <th className="text-center">Kualifikasi</th>
+                            <th>Keterangan</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -2912,13 +2914,13 @@ export default function App() {
                                 <td className="text-right font-mono">
                                   {s.target} {s.unit}
                                 </td>
-                                <td className="text-right font-mono">
-                                  {s.minAllowed} ~ {s.maxAllowed} {s.unit}
-                                </td>
                                 <td className="text-right font-mono font-bold">
                                   {s.actual} {s.unit}
                                 </td>
-                                <td className="text-center">{s.status}</td>
+                                <td className="text-center font-bold">
+                                  {s.status}
+                                </td>
+                                <td>{s.remark}</td>
                               </tr>
                             )
                           )}
@@ -2927,49 +2929,46 @@ export default function App() {
                     </div>
 
                     {/* Notes */}
-                    <div className="border border-slate-300 rounded p-3 text-xs">
-                      <strong>Catatan Inspector / Supervisor:</strong>
-                      <p className="mt-1 text-slate-700 italic">
-                        {printPreviewModal.data.statusReason ||
-                          'Tidak ada catatan khusus.'}
+                    <div className="border border-slate-300 rounded p-3 text-xs bg-slate-50">
+                      <strong>Catatan / Justifikasi QC Inspector:</strong>
+                      <p className="mt-1 text-slate-700">
+                        {printPreviewModal.data.statusReason || '-'}
                       </p>
+                    </div>
+
+                    {/* Signatures */}
+                    <div className="pt-6 grid grid-cols-2 gap-8 text-center text-xs page-break-inside-avoid">
+                      <div>
+                        <div className="text-slate-500 mb-12">
+                          QC Inspector / Officer
+                        </div>
+                        <div className="font-bold underline text-slate-800">
+                          ( {printPreviewModal.data.inspector} )
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-slate-500 mb-12">
+                          Production Supervisor
+                        </div>
+                        <div className="font-bold underline text-slate-800">
+                          ( Manager Produksi )
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
-
-              {/* Signature Approval Block */}
-              <div className="pt-8 grid grid-cols-2 gap-8 text-center text-xs page-break-inside-avoid">
-                <div>
-                  <p className="text-slate-600 mb-12">
-                    Disiapkan Oleh (QC Inspector):
-                  </p>
-                  <p className="font-bold border-t border-slate-400 pt-1 inline-block min-w-[180px]">
-                    {printPreviewModal.type === 'SINGLE'
-                      ? printPreviewModal.data?.inspector
-                      : 'Ahmad Zaky (QC Officer)'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-slate-600 mb-12">
-                    Disetujui Oleh (Production Supervisor):
-                  </p>
-                  <p className="font-bold border-t border-slate-400 pt-1 inline-block min-w-[180px]">
-                    Deni Kurniawan (QC Lead)
-                  </p>
-                </div>
-              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL: TAMBAH MODEL PRODUK BARU */}
+      {/* CREATE NEW PRODUCT MODEL MODAL */}
       {isAddProductModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 no-print">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-4 shadow-2xl animate-fadeIn">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex justify-center items-center p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl animate-fadeIn">
+            <div className="flex justify-between items-center border-b border-slate-700 pb-3">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <PlusCircle className="w-5 h-5 text-indigo-400" /> Tambah Model
+                <PlusCircle className="w-5 h-5 text-indigo-400" /> Buat Model
                 Produk Custom Baru
               </h3>
               <button
@@ -2980,31 +2979,28 @@ export default function App() {
               </button>
             </div>
 
-            <form
-              onSubmit={handleCreateNewProduct}
-              className="space-y-4 text-xs"
-            >
+            <form onSubmit={handleCreateNewProduct} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-400 block mb-1">
+                  <label className="text-xs text-slate-400 block mb-1">
                     Kode ID Produk (Unik):
                   </label>
                   <input
                     type="text"
-                    placeholder="misal: PROD-VB03"
                     value={newProductForm.id}
                     onChange={(e) =>
                       setNewProductForm({
                         ...newProductForm,
-                        id: e.target.value,
+                        id: e.target.value.toUpperCase(),
                       })
                     }
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white font-mono"
+                    placeholder="PROD-NEW01"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono"
                     required
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1">
+                  <label className="text-xs text-slate-400 block mb-1">
                     Kategori Produk:
                   </label>
                   <input
@@ -3016,19 +3012,18 @@ export default function App() {
                         category: e.target.value,
                       })
                     }
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
                     required
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-slate-400 block mb-1">
-                  Nama Lengkap Produk:
+                <label className="text-xs text-slate-400 block mb-1">
+                  Nama Model Produk:
                 </label>
                 <input
                   type="text"
-                  placeholder="misal: Vertical Blinds 127mm Standard"
                   value={newProductForm.name}
                   onChange={(e) =>
                     setNewProductForm({
@@ -3036,31 +3031,15 @@ export default function App() {
                       name: e.target.value,
                     })
                   }
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white font-bold"
+                  placeholder="Contoh: Venetian Blinds Aluminium 25mm"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-bold"
                   required
                 />
               </div>
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="text-slate-400 block mb-1">
-                    Satuan Ukuran:
-                  </label>
-                  <input
-                    type="text"
-                    value={newProductForm.unitDim}
-                    onChange={(e) =>
-                      setNewProductForm({
-                        ...newProductForm,
-                        unitDim: e.target.value,
-                      })
-                    }
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white font-mono"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-slate-400 block mb-1">
+                  <label className="text-xs text-slate-400 block mb-1">
                     Default Lebar (L):
                   </label>
                   <input
@@ -3072,11 +3051,11 @@ export default function App() {
                         defaultL: parseFloat(e.target.value) || 0,
                       })
                     }
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white font-mono"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono"
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1">
+                  <label className="text-xs text-slate-400 block mb-1">
                     Default Tinggi (T):
                   </label>
                   <input
@@ -3088,22 +3067,42 @@ export default function App() {
                         defaultT: parseFloat(e.target.value) || 0,
                       })
                     }
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white font-mono"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono"
                   />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">
+                    Satuan Ukur:
+                  </label>
+                  <select
+                    value={newProductForm.unitDim}
+                    onChange={(e) =>
+                      setNewProductForm({
+                        ...newProductForm,
+                        unitDim: e.target.value,
+                      })
+                    }
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-bold"
+                  >
+                    <option value="cm">cm</option>
+                    <option value="mm">mm</option>
+                    <option value="m">m</option>
+                    <option value="inch">inch</option>
+                  </select>
                 </div>
               </div>
 
-              <div className="pt-2 flex justify-end space-x-2">
+              <div className="pt-3 border-t border-slate-700 flex justify-end space-x-2">
                 <button
                   type="button"
                   onClick={() => setIsAddProductModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold"
+                  className="px-4 py-2 bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold shadow-lg shadow-indigo-600/30"
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg shadow-lg shadow-indigo-600/30"
                 >
                   Simpan Produk Baru
                 </button>
@@ -3113,95 +3112,111 @@ export default function App() {
         </div>
       )}
 
-      {/* INSPECTION DETAIL MODAL */}
+      {/* VIEW SINGLE INSPECTION DETAILS MODAL */}
       {selectedInspection && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 no-print">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl p-6 space-y-4 text-slate-200">
-            <div className="flex justify-between items-start border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex justify-center items-center p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl animate-fadeIn max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-slate-700 pb-3">
               <div>
-                <h3 className="text-lg font-bold text-white">
-                  {selectedInspection.id} - {selectedInspection.productName}
+                <span className="text-xs font-mono font-bold text-indigo-400">
+                  {selectedInspection.id}
+                </span>
+                <h3 className="text-base font-bold text-white">
+                  Detail Audit Inspeksi QC - {selectedInspection.woNumber}
                 </h3>
-                <p className="text-xs text-slate-400">
-                  {selectedInspection.customer} | WO:{' '}
-                  {selectedInspection.woNumber}
-                </p>
               </div>
               <button
                 onClick={() => setSelectedInspection(null)}
-                className="p-1 bg-slate-800 rounded"
+                className="text-slate-400 hover:text-white"
               >
-                <X className="w-5 h-5 text-slate-400" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="text-xs space-y-2">
-              <div className="font-bold text-indigo-400">
-                Hasil Evaluasi BoM Pemakaian Bahan:
-              </div>
-              <div className="bg-slate-800 rounded-lg p-3">
-                {selectedInspection.bomComparison.map((b, idx) => (
-                  <div
-                    key={idx}
-                    className="flex justify-between border-b border-slate-700/50 py-1"
+            <div className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-700">
+                <div>
+                  <span className="text-slate-400">Customer:</span>{' '}
+                  <strong className="text-white">
+                    {selectedInspection.customer}
+                  </strong>
+                </div>
+                <div>
+                  <span className="text-slate-400">Produk:</span>{' '}
+                  <strong className="text-white">
+                    {selectedInspection.productName}
+                  </strong>
+                </div>
+                <div>
+                  <span className="text-slate-400">Tanggal:</span>{' '}
+                  <span className="text-slate-200">
+                    {selectedInspection.date}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400">Status QC:</span>{' '}
+                  <span
+                    className={`font-bold px-2 py-0.5 rounded text-[10px] ${
+                      selectedInspection.overallStatus === 'PASS'
+                        ? 'bg-emerald-500/20 text-emerald-300'
+                        : selectedInspection.overallStatus === 'REJECT'
+                        ? 'bg-rose-500/20 text-rose-300'
+                        : 'bg-amber-500/20 text-amber-300'
+                    }`}
                   >
-                    <span>{b.materialName}</span>
-                    <span className="font-mono text-emerald-400 font-bold">
-                      Target: {b.planned} {b.unit} | Realisasi: {b.actual}{' '}
-                      {b.unit}
-                    </span>
-                  </div>
-                ))}
+                    {selectedInspection.overallStatus}
+                  </span>
+                </div>
               </div>
-            </div>
 
-            <div className="flex justify-end pt-2 space-x-2">
-              <button
-                onClick={() => triggerPrintSingleInspection(selectedInspection)}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold text-white flex items-center gap-1.5"
-              >
-                <Printer className="w-4 h-4" /> Cetak PDF Sertifikat QC
-              </button>
-              <button
-                onClick={() => setSelectedInspection(null)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-bold text-slate-300"
-              >
-                Tutup
-              </button>
+              <div>
+                <h4 className="font-bold text-slate-300 uppercase mb-1">
+                  Koreksi Pemakaian BoM:
+                </h4>
+                <div className="bg-slate-900 rounded-lg p-2 border border-slate-700">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="text-slate-400 border-b border-slate-800">
+                        <th className="py-1">Material</th>
+                        <th className="py-1">Plan</th>
+                        <th className="py-1">Actual</th>
+                        <th className="py-1">Deviasi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {selectedInspection.bomComparison.map((m, i) => (
+                        <tr key={i}>
+                          <td className="py-1 text-slate-200">
+                            {m.materialName}
+                          </td>
+                          <td className="py-1 font-mono">{m.planned}</td>
+                          <td className="py-1 font-mono font-bold">
+                            {m.actual}
+                          </td>
+                          <td className="py-1 font-mono">{m.devPct}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="pt-2 flex justify-end space-x-2">
+                <button
+                  onClick={() => {
+                    const item = selectedInspection;
+                    setSelectedInspection(null);
+                    triggerPrintSingleInspection(item);
+                  }}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg flex items-center gap-2"
+                >
+                  <Printer className="w-4 h-4" /> Cetak Dokumen Sertifikat PDF
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
-
-      {/* Footer */}
-      <footer className="border-t border-slate-800 py-4 text-center text-xs text-slate-500 no-print">
-        Operational Inspection System with Dynamic Custom BoM Calculator &
-        Summary Reports &bull; QC Operasional &copy; 2026
-      </footer>
     </div>
   );
-  // ==========================================
-// FITUR TAMBAHAN: HAPUS & RESET DATA
-// ==========================================
-
-  // 1. Fungsi Hapus Data per Baris
-  const handleDeleteRow = (id) => {
-    if (window.confirm("Apakah Anda yakin ingin menghapus data inspeksi ini?")) {
-      const updatedHistory = auditHistory.filter((item) => item.id !== id);
-      setAuditHistory(updatedHistory);
-      localStorage.setItem("audit_history", JSON.stringify(updatedHistory));
-    }
-  };
-
-  // 2. Fungsi Reset Semua Data
-  const handleResetAllData = () => {
-    const confirmText = window.prompt(
-      "PERINGATAN: Ini akan menghapus seluruh riwayat audit!\nKetik 'HAPUS' untuk mengonfirmasi:"
-    );
-    if (confirmText === "HAPUS") {
-      setAuditHistory([]);
-      localStorage.removeItem("audit_history");
-      alert("Semua data berhasil dibersihkan!");
-    }
-  };
 }
