@@ -3180,4 +3180,28 @@ export default function App() {
       </footer>
     </div>
   );
+  // ==========================================
+// FITUR TAMBAHAN: HAPUS & RESET DATA
+// ==========================================
+
+  // 1. Fungsi Hapus Data per Baris
+  const handleDeleteRow = (id) => {
+    if (window.confirm("Apakah Anda yakin ingin menghapus data inspeksi ini?")) {
+      const updatedHistory = auditHistory.filter((item) => item.id !== id);
+      setAuditHistory(updatedHistory);
+      localStorage.setItem("audit_history", JSON.stringify(updatedHistory));
+    }
+  };
+
+  // 2. Fungsi Reset Semua Data
+  const handleResetAllData = () => {
+    const confirmText = window.prompt(
+      "PERINGATAN: Ini akan menghapus seluruh riwayat audit!\nKetik 'HAPUS' untuk mengonfirmasi:"
+    );
+    if (confirmText === "HAPUS") {
+      setAuditHistory([]);
+      localStorage.removeItem("audit_history");
+      alert("Semua data berhasil dibersihkan!");
+    }
+  };
 }
