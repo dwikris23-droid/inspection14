@@ -1,14 +1,98 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React + TS</title>
-  </head>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aplikasi Firebase Firestore</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; max-width: 500px; }
+    input, button { padding: 8px; margin: 5px 0; }
+    ul { list-style-type: none; padding: 0; }
+    li { display: flex; justify-content: space-between; align-items: center; background: #f4f4f4; margin: 5px 0; padding: 10px; border-radius: 4px; }
+    .btn-hapus { background: red; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+  <h2>Daftar Data Global</h2>
+  
+  <input type="text" id="inputData" placeholder="Masukkan data baru...">
+  <button onclick="tambahData()">Tambah Data</button>
+
+  <ul id="daftarData"></ul>
+
+  <!-- Import Firebase SDK v9 (Modular) via CDN -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { 
+      getFirestore, 
+      collection, 
+      addDoc, 
+      deleteDoc, 
+      doc, 
+      onSnapshot 
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // 1. Tempelkan firebaseConfig milik Anda di sini
+    const firebaseConfig = {
+      apiKey: "AIzaSyDRbtLQ8cDw936hT7-jd0RZWQoOA1-cI8U",
+      authDomain: "fabricaops.firebaseapp.com",
+      projectId: "fabricaops",
+      storageBucket: "fabricaops.firebasestorage.app",
+      messagingSenderId: "756784408812",
+      appId: "1:756784408812:web:378924ce02f5d82f861dc9"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const dataRef = collection(db, "koleksi_data"); // Nama koleksi di Firestore
+
+    // 2. Fungsi untuk Menambah Data ke Firestore
+    window.tambahData = async function() {
+      const input = document.getElementById("inputData");
+      const teks = input.value.trim();
+
+      if (teks === "") return alert("Data tidak boleh kosong!");
+
+      try {
+        await addDoc(dataRef, {
+          nama: teks,
+          created: new Date()
+        });
+        input.value = ""; // Kosongkan input
+      } catch (e) {
+        console.error("Gagal menambah data: ", e);
+      }
+    };
+
+    // 3. Fungsi untuk Menghapus Data dari Firestore
+    window.hapusData = async function(id) {
+      try {
+        await deleteDoc(doc(db, "koleksi_data", id));
+      } catch (e) {
+        console.error("Gagal menghapus data: ", e);
+      }
+    };
+
+    // 4. Fungsi Realtime listener (Mengambil & Menampilkan Data Otomatis)
+    onSnapshot(dataRef, (snapshot) => {
+      const listElement = document.getElementById("daftarData");
+      listElement.innerHTML = ""; // Bersihkan tampilan lama
+
+      snapshot.forEach((docSnapshot) => {
+        const item = docSnapshot.data();
+        const id = docSnapshot.id;
+
+        const li = document.createElement("li");
+        li.innerHTML = `
+          <span>${item.nama}</span>
+          <button class="btn-hapus" onclick="hapusData('${id}')">Hapus</button>
+        `;
+        listElement.appendChild(li);
+      });
+    });
+  </script>
+
+</body>
 </html>
