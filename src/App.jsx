@@ -3,25 +3,11 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { db } from './firebase'; 
 import { collection, onSnapshot, addDoc } from 'firebase/firestore'; 
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-} from 'recharts';
-import {
   ClipboardCheck,
   AlertTriangle,
   CheckCircle,
   XCircle,
   Search,
-  Filter,
   Plus,
   Layers,
   Ruler,
@@ -34,29 +20,16 @@ import {
   Printer,
   ShieldAlert,
   Check,
-  Factory,
-  Sliders,
   Calculator,
   ArrowRight,
   Settings,
-  Info,
   Sparkles,
-  RefreshCw,
   Scissors,
-  ChevronDown,
-  CheckSquare,
   Edit3,
-  Save,
   PlusCircle,
   X,
-  TrendingUp,
-  TrendingDown,
-  Calendar,
   Users,
-  FileSpreadsheet,
-  Download,
   Activity,
-  HardDrive,
 } from 'lucide-react';
 
 // Evaluator Formula Dinamis (Mendukung L, T, P, Q dan Operator Matematika JS)
@@ -2425,6 +2398,74 @@ export default function App() {
         </div>
       )}
 
+      {/* MODAL DETAIL INSPEKSI */}
+      {selectedInspection && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn no-print">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl max-w-3xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto text-xs">
+            <div className="flex justify-between items-center border-b border-slate-700 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-white font-mono">
+                  Detail Inspeksi: {selectedInspection.inspectionCustomId || selectedInspection.id}
+                </h3>
+                <p className="text-slate-400 mt-0.5">
+                  WO: {selectedInspection.woNumber} | SO: {selectedInspection.soNumber} - {selectedInspection.customer}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedInspection(null)}
+                className="p-1 rounded-lg bg-slate-700 text-slate-300 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 bg-slate-900 p-3 rounded-xl border border-slate-700">
+              <div>
+                <span className="text-slate-400 block">Produk:</span>
+                <span className="font-bold text-white">{selectedInspection.productName}</span>
+              </div>
+              <div>
+                <span className="text-slate-400 block">Inspector / Shift:</span>
+                <span className="font-bold text-white">{selectedInspection.inspector} ({selectedInspection.shift})</span>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-bold text-white mb-2 uppercase text-indigo-400">Pemeriksaan BoM:</h4>
+              <table className="w-full text-left border border-slate-700 rounded-lg overflow-hidden">
+                <thead className="bg-slate-900 text-slate-400">
+                  <tr>
+                    <th className="p-2">Material</th>
+                    <th className="p-2">Target BoM</th>
+                    <th className="p-2">Aktual</th>
+                    <th className="p-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700/50">
+                  {selectedInspection.bomComparison?.map((b, i) => (
+                    <tr key={i}>
+                      <td className="p-2 text-white">{b.materialName}</td>
+                      <td className="p-2 text-indigo-300 font-mono">{b.planned} {b.unit}</td>
+                      <td className="p-2 text-white font-mono">{b.actual} {b.unit}</td>
+                      <td className="p-2 font-bold">{b.status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                onClick={() => setSelectedInspection(null)}
+                className="px-4 py-2 bg-slate-700 text-white rounded-lg font-bold hover:bg-slate-600"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL / DIALOG CETAK PDF REPORT & SERTIFIKAT AUDIT */}
       {printPreviewModal.isOpen && (
         <div className="printable-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
@@ -2563,185 +2604,99 @@ export default function App() {
                     </tbody>
                   </table>
                 </div>
-
-                <div className="pt-8 flex justify-between text-xs text-slate-600 page-break-inside-avoid">
-                  <div className="text-center w-40">
-                    <div>Dibuat Oleh,</div>
-                    <div className="h-16"></div>
-                    <div className="font-bold text-slate-900 border-t pt-1">
-                      QC Inspector
-                    </div>
-                  </div>
-                  <div className="text-center w-40">
-                    <div>Disetujui Oleh,</div>
-                    <div className="h-16"></div>
-                    <div className="font-bold text-slate-900 border-t pt-1">
-                      Supervisor Produksi
-                    </div>
-                  </div>
-                </div>
               </div>
             )}
 
-            {/* HALAMAN DOKUMEN CETAK SINGLE SERTIFIKAT AUDIT */}
-            {printPreviewModal.type === 'SINGLE' && (
+            {/* HALAMAN DOKUMEN CETAK SINGLE INSPECTION */}
+            {printPreviewModal.type === 'SINGLE' && printPreviewModal.data && (
               <div className="space-y-6">
                 <div className="flex justify-between items-center border-b pb-4">
                   <div>
                     <h1 className="text-xl font-bold uppercase tracking-wide text-slate-900">
-                      LEMBAR SERTIFIKAT AUDIT KUALITAS PRODUK (QC)
+                      SERTIFIKAT HASIL INSPEKSI QC PRODUKSI
                     </h1>
                     <p className="text-xs text-slate-600 mt-0.5">
-                      Nomor Dokumen Audit:{' '}
-                      <span className="font-mono font-bold text-slate-900">
-                        {printPreviewModal.data?.inspectionCustomId}
-                      </span>
+                      ID Inspeksi: {printPreviewModal.data.inspectionCustomId || printPreviewModal.data.id}
                     </p>
                   </div>
                   <div className="text-right">
-                    <span
-                      className={`badge-${
-                        printPreviewModal.data?.overallStatus === 'PASS'
-                          ? 'pass'
-                          : printPreviewModal.data?.overallStatus === 'REJECT'
-                          ? 'reject'
-                          : 'cond'
-                      }`}
-                    >
-                      STATUS: {printPreviewModal.data?.overallStatus}
+                    <span className={
+                      printPreviewModal.data.overallStatus === 'PASS' 
+                        ? 'badge-pass' 
+                        : printPreviewModal.data.overallStatus === 'REJECT' 
+                        ? 'badge-reject' 
+                        : 'badge-cond'
+                    }>
+                      {printPreviewModal.data.overallStatus}
                     </span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 text-xs border p-3 rounded-lg bg-slate-50">
+                <div className="grid grid-cols-2 gap-4 text-xs">
                   <div>
-                    <span className="text-slate-500 block">Work Order (WO):</span>
-                    <span className="font-bold font-mono text-slate-900">
-                      {printPreviewModal.data?.woNumber}
-                    </span>
+                    <p><strong>No. WO:</strong> {printPreviewModal.data.woNumber}</p>
+                    <p><strong>No. SO / Customer:</strong> {printPreviewModal.data.soNumber} / {printPreviewModal.data.customer}</p>
+                    <p><strong>Produk:</strong> {printPreviewModal.data.productName}</p>
                   </div>
                   <div>
-                    <span className="text-slate-500 block">
-                      Sales Order & Customer:
-                    </span>
-                    <span className="font-bold text-slate-900">
-                      {printPreviewModal.data?.soNumber} -{' '}
-                      {printPreviewModal.data?.customer}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block">Nama Produk:</span>
-                    <span className="font-bold text-slate-900">
-                      {printPreviewModal.data?.productName}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block">
-                      Inspector & Shift:
-                    </span>
-                    <span className="font-bold text-slate-900">
-                      {printPreviewModal.data?.inspector} (
-                      {printPreviewModal.data?.shift})
-                    </span>
+                    <p><strong>Tanggal:</strong> {printPreviewModal.data.date}</p>
+                    <p><strong>Inspector:</strong> {printPreviewModal.data.inspector}</p>
+                    <p><strong>Shift:</strong> {printPreviewModal.data.shift}</p>
                   </div>
                 </div>
 
                 <div>
-                  <h3 className="font-bold text-sm uppercase text-slate-800 mb-2 border-b pb-1">
-                    Detail Konsumsi Bahan Baku (BoM Calculation)
-                  </h3>
+                  <h3 className="font-bold text-xs uppercase text-slate-800 mb-1">Rincian Komponen BoM</h3>
                   <table>
                     <thead>
                       <tr>
-                        <th>Bahan Baku</th>
-                        <th>Satuan</th>
-                        <th>Target BoM</th>
+                        <th>Material</th>
+                        <th>Target</th>
                         <th>Aktual</th>
+                        <th>Deviasi (%)</th>
                         <th>Status</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {printPreviewModal.data?.bomComparison?.map(
-                        (item, idx) => (
-                          <tr key={idx}>
-                            <td className="font-bold">{item.materialName}</td>
-                            <td>{item.unit}</td>
-                            <td className="text-right font-mono">
-                              {item.planned}
-                            </td>
-                            <td className="text-right font-mono">
-                              {item.actual}
-                            </td>
-                            <td className="text-center">{item.status}</td>
-                          </tr>
-                        )
-                      )}
+                      {printPreviewModal.data.bomComparison?.map((item, idx) => (
+                        <tr key={idx}>
+                          <td>{item.materialName}</td>
+                          <td>{item.planned} {item.unit}</td>
+                          <td>{item.actual} {item.unit}</td>
+                          <td>{item.devPct}%</td>
+                          <td>{item.status}</td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
 
                 <div>
-                  <h3 className="font-bold text-sm uppercase text-slate-800 mb-2 border-b pb-1">
-                    Pemeriksaan Ukuran Dimensi Hasil Jadi vs Sales Order
-                  </h3>
+                  <h3 className="font-bold text-xs uppercase text-slate-800 mb-1">Pemeriksaan Dimensi SO</h3>
                   <table>
                     <thead>
                       <tr>
-                        <th>Parameter</th>
+                        <th>Spesifikasi</th>
                         <th>Target SO</th>
-                        <th>Batas Toleransi</th>
-                        <th>Ukur Fisik</th>
-                        <th>Hasil</th>
+                        <th>Aktual Ukur</th>
+                        <th>Kualifikasi</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {printPreviewModal.data?.soDimensionCheck?.map(
-                        (spec, idx) => (
-                          <tr key={idx}>
-                            <td className="font-bold">{spec.specName}</td>
-                            <td className="font-mono">
-                              {spec.target} {spec.unit}
-                            </td>
-                            <td className="font-mono">
-                              {spec.minAllowed} ~ {spec.maxAllowed}
-                            </td>
-                            <td className="font-mono text-right">
-                              {spec.actual} {spec.unit}
-                            </td>
-                            <td className="text-center font-bold">
-                              {spec.status}
-                            </td>
-                          </tr>
-                        )
-                      )}
+                      {printPreviewModal.data.soDimensionCheck?.map((spec, idx) => (
+                        <tr key={idx}>
+                          <td>{spec.specName}</td>
+                          <td>{spec.target} {spec.unit}</td>
+                          <td>{spec.actual} {spec.unit}</td>
+                          <td>{spec.status}</td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
 
-                <div className="p-3 border rounded-lg bg-slate-50 text-xs">
-                  <span className="font-bold text-slate-800 block">
-                    Catatan Evaluasi / Keterangan:
-                  </span>
-                  <p className="text-slate-600 mt-0.5">
-                    {printPreviewModal.data?.statusReason}
-                  </p>
-                </div>
-
-                <div className="pt-8 flex justify-between text-xs text-slate-600 page-break-inside-avoid">
-                  <div className="text-center w-40">
-                    <div>Petugas QC,</div>
-                    <div className="h-16"></div>
-                    <div className="font-bold text-slate-900 border-t pt-1">
-                      ({printPreviewModal.data?.inspector})
-                    </div>
-                  </div>
-                  <div className="text-center w-40">
-                    <div>Disetujui Supervisor,</div>
-                    <div className="h-16"></div>
-                    <div className="font-bold text-slate-900 border-t pt-1">
-                      ( Manajer QC )
-                    </div>
-                  </div>
+                <div className="text-xs border-t pt-2">
+                  <p><strong>Catatan Audit:</strong> {printPreviewModal.data.statusReason}</p>
                 </div>
               </div>
             )}
