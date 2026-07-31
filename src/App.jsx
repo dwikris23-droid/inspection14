@@ -1,4 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
+iimport React, { useState, useMemo, useEffect } from 'react';
+
+// Import Firebase (dipisah sendiri)
+import { db } from './firebase';
+import { collection, onSnapshot, addDoc } from 'firebase/firestore';
 import {
   BarChart,
   Bar,
@@ -11,7 +15,7 @@ import {
   PieChart,
   Pie,
   Cell,
-} from 'recharts';
+}from 'recharts';
 import {
   ClipboardCheck,
   AlertTriangle,
