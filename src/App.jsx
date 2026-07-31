@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+// 1. IMPORT FIREBASE SDK
 import { initializeApp } from 'firebase/app';
 import {
   getFirestore,
@@ -39,7 +40,8 @@ import {
 } from 'lucide-react';
 
 // ==========================================
-// KONFIGURASI FIREBASE FIRESTORE
+// 2. KONFIGURASI FIREBASE FIRESTORE
+// Sesuaikan dengan kunci API/Config Firebase Anda
 // ==========================================
 const firebaseConfig = {
   apiKey: "YOUR_API_KEY",
@@ -77,16 +79,17 @@ const evaluateFormula = (formulaStr, params) => {
 export default function App() {
   const [activeTab, setActiveTab] = useState('new_inspection');
   
+  // Data State dikosongkan total untuk Firestore
   const [productTemplates, setProductTemplates] = useState([]);
   const [inspections, setInspections] = useState([]);
   
   const [selectedInspection, setSelectedInspection] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
-  // PREVIEW MODAL STATE FOR PDF / PRINT
+  // PREVIEW MODAL STATE
   const [printPreviewModal, setPrintPreviewModal] = useState({
     isOpen: false,
-    type: 'SUMMARY', // 'SUMMARY' atau 'SINGLE'
+    type: 'SUMMARY',
     data: null,
   });
 
@@ -120,7 +123,7 @@ export default function App() {
   const [actualDimensionsMeasured, setActualDimensionsMeasured] = useState({});
   const [inspectionNotes, setInspectionNotes] = useState('');
 
-  // MODAL STATES
+  // MODAL / EDITOR STATES
   const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
   const [newProductForm, setNewProductForm] = useState({
     customId: '',
@@ -154,8 +157,11 @@ export default function App() {
     estWasteStandardPct: 3.0,
   });
 
-  // LISTEN DATA REALTIME FROM FIRESTORE
+  // ==========================================
+  // 3. LISTEN DATA REALTIME DARI FIRESTORE
+  // ==========================================
   useEffect(() => {
+    // Sync Product Templates Collection
     const unsubscribeTemplates = onSnapshot(
       collection(db, 'productTemplates'),
       (snapshot) => {
@@ -170,6 +176,7 @@ export default function App() {
       }
     );
 
+    // Sync Inspections Collection
     const unsubscribeInspections = onSnapshot(
       collection(db, 'inspections'),
       (snapshot) => {
@@ -208,6 +215,7 @@ export default function App() {
     }
   }, [selectedProductTemplateId, currentTemplate]);
 
+  // ACTION: DELETE INSPECTION FROM FIRESTORE
   const handleDeleteInspection = async (docId, customId) => {
     if (window.confirm(`Apakah Anda yakin ingin menghapus data inspeksi ${customId || docId}?`)) {
       try {
@@ -222,12 +230,14 @@ export default function App() {
     }
   };
 
+  // ACTION: RESET DATE RANGE FILTER
   const handleResetDateFilter = () => {
     setStartDate('');
     setEndDate('');
     showToast('Filter rentang tanggal berhasil di-reset.');
   };
 
+  // ACTION: SAVE NEW PRODUCT TO FIRESTORE
   const handleSaveNewProduct = async (e) => {
     e.preventDefault();
     if (!newProductForm.customId || !newProductForm.name) {
@@ -276,6 +286,7 @@ export default function App() {
     }
   };
 
+  // ACTION: EXPORT TO CSV
   const handleExportCSV = () => {
     if (filteredInspections.length === 0) {
       showToast('Tidak ada data untuk diekspor!', 'error');
@@ -470,6 +481,7 @@ export default function App() {
     actualDimensionsMeasured,
   ]);
 
+  // ACTION: SAVE INSPECTION TO FIRESTORE
   const handleSubmitInspection = async (e) => {
     e.preventDefault();
     if (!auditEvaluation || !currentTemplate) return;
@@ -524,6 +536,7 @@ export default function App() {
     }
   };
 
+  // UPDATE FORMULA AT FIRESTORE
   const handleUpdateFormulaItem = async (tmplDocId, formulaId, updatedField, value) => {
     const tmpl = productTemplates.find((t) => t.docId === tmplDocId);
     if (!tmpl) return;
@@ -583,6 +596,7 @@ export default function App() {
     }
   };
 
+  // Filtered Inspections
   const filteredInspections = useMemo(() => {
     return inspections.filter((item) => {
       const matchesSearch =
@@ -608,6 +622,7 @@ export default function App() {
     });
   }, [inspections, searchQuery, statusFilter, startDate, endDate]);
 
+  // Executive Summary
   const summaryMetrics = useMemo(() => {
     const totalInspections = filteredInspections.length;
     if (totalInspections === 0) return null;
@@ -683,7 +698,6 @@ export default function App() {
     };
   }, [filteredInspections]);
 
-  // TRIGGER PRINT FUNCTIONS
   const triggerPrintSummaryReport = () => {
     setPrintPreviewModal({
       isOpen: true,
@@ -708,30 +722,12 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans antialiased flex flex-col selection:bg-indigo-500 selection:text-white">
-      {/* STYLE KHUSUS PRINT PDF */}
       <style>{`
         @media print {
-          body * {
-            visibility: hidden;
-          }
-          .printable-document, .printable-document * {
-            visibility: visible;
-          }
-          .printable-document {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            background: white !important;
-            color: black !important;
-            box-shadow: none !important;
-            border: none !important;
-            padding: 0 !important;
-            margin: 0 !important;
-          }
-          .no-print {
-            display: none !important;
-          }
+          .no-print, header, nav, button { display: none !important; }
+          body { background-color: white !important; color: black !important; }
+          .printable-modal-overlay { position: absolute !important; inset: 0 !important; background: white !important; p: 0 !important; }
+          .printable-document { border: none !important; box-shadow: none !important; }
         }
       `}</style>
 
@@ -1607,7 +1603,7 @@ export default function App() {
 
       {/* MODAL VIEW INSPECTION DETAIL */}
       {selectedInspection && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex justify-center items-center p-4 no-print">
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex justify-center items-center p-4">
           <div className="bg-slate-800 border border-slate-700 text-white rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl relative">
             <button
               onClick={() => setSelectedInspection(null)}
@@ -1664,7 +1660,7 @@ export default function App() {
 
       {/* MODAL TAMBAH PRODUCT TEMPLATE BARU */}
       {isAddProductModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex justify-center items-center p-4 no-print">
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex justify-center items-center p-4">
           <form onSubmit={handleSaveNewProduct} className="bg-slate-800 border border-slate-700 text-white rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl relative">
             <button
               type="button"
@@ -1731,17 +1727,14 @@ export default function App() {
         </div>
       )}
 
-      {/* ========================================== */}
-      {/* TEMPLATE LAPORAN PRINT / PDF PREVIEW       */}
-      {/* ========================================== */}
+      {/* MODAL PRINT PREVIEW */}
       {printPreviewModal.isOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex justify-center items-start overflow-y-auto p-4">
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex justify-center items-start overflow-y-auto p-4 printable-modal-overlay">
           <div className="bg-white text-slate-900 rounded-xl max-w-4xl w-full shadow-2xl overflow-hidden my-6 border border-slate-300 printable-document animate-fadeIn">
-            {/* Header Modal Action Bar (Hidden when Printing) */}
             <div className="bg-slate-900 text-white p-4 flex items-center justify-between no-print border-b border-slate-800">
               <div className="flex items-center space-x-2">
                 <Printer className="w-5 h-5 text-indigo-400" />
-                <span className="font-bold text-sm">Preview Cetak Dokumen PDF</span>
+                <span className="font-bold text-sm">Print Dokumen QC</span>
               </div>
               <div className="flex items-center space-x-3">
                 <button
@@ -1749,7 +1742,7 @@ export default function App() {
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg shadow flex items-center gap-2"
                 >
                   <Printer className="w-4 h-4" />
-                  <span>Cetak / Simpan PDF</span>
+                  <span>Cetak / PDF</span>
                 </button>
                 <button
                   onClick={() =>
@@ -1766,148 +1759,63 @@ export default function App() {
               </div>
             </div>
 
-            {/* ISI TEMPLATE DOKUMEN CETAK */}
-            <div className="p-8 space-y-6 text-slate-900">
-              {/* Header Dokumen */}
+            <div className="p-8 space-y-6">
               <div className="border-b-2 border-slate-800 pb-4 flex justify-between items-end">
                 <div>
-                  <h1 className="text-2xl font-black tracking-wider text-slate-900">
+                  <h1 className="text-xl font-bold tracking-tight text-slate-900">
                     FABRICA INDONESIA
                   </h1>
-                  <p className="text-xs text-slate-600 font-semibold">
-                    Laporan Resmi QC & Audit Consumable BoM Custom
+                  <p className="text-xs text-slate-600">
+                    Sistem Inspeksi QC & BoM Custom
                   </p>
                 </div>
-                <div className="text-right text-xs font-mono text-slate-500">
-                  Tanggal Cetak: {new Date().toLocaleDateString('id-ID')}
-                </div>
               </div>
 
-              {/* MODEL TEMPLATE 1: SUMMARY REPORT */}
               {printPreviewModal.type === 'SUMMARY' && summaryMetrics && (
-                <div className="space-y-6">
-                  <div className="bg-slate-100 p-4 rounded-lg border border-slate-200">
-                    <h3 className="font-bold text-sm text-slate-800 uppercase mb-2">
-                      Ringkasan Kinerja QC Operasional
-                    </h3>
-                    <div className="grid grid-cols-4 gap-4 text-xs font-mono">
-                      <div>Total Order: <strong>{summaryMetrics.totalInspections}</strong></div>
-                      <div>Pass Rate: <strong className="text-emerald-700">{summaryMetrics.passRate}%</strong></div>
-                      <div>Order Reject: <strong className="text-rose-700">{summaryMetrics.rejectCount}</strong></div>
-                      <div>Discrepancy: <strong>{summaryMetrics.wasteSummary.discrepancyCount}</strong></div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h4 className="font-bold text-xs uppercase text-slate-800 mb-3 border-b pb-1">
-                      Akumulasi Rekapitulasi Pemakaian Bahan Baku (BoM)
-                    </h4>
-                    <table className="w-full text-xs text-left border-collapse">
-                      <thead>
-                        <tr className="bg-slate-200 text-slate-800 font-bold border-b border-slate-300">
-                          <th className="py-2 px-3">Nama Bahan Baku</th>
-                          <th className="py-2 px-3">Satuan</th>
-                          <th className="py-2 px-3 text-right">Total Target BoM</th>
-                          <th className="py-2 px-3 text-right">Total Realisasi</th>
-                          <th className="py-2 px-3 text-right">Selisih Varian</th>
+                <div className="space-y-4">
+                  <h4 className="font-bold text-xs uppercase text-slate-800">
+                    Rekapitulasi Inspeksi QC
+                  </h4>
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr>
+                        <th>Bahan Baku</th>
+                        <th>Satuan</th>
+                        <th className="text-right">Total Target</th>
+                        <th className="text-right">Total Aktual</th>
+                        <th className="text-right">Selisih</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {summaryMetrics.aggregatedMaterials.map((mat, i) => (
+                        <tr key={i}>
+                          <td className="font-bold">{mat.name}</td>
+                          <td>{mat.unit}</td>
+                          <td className="text-right font-mono">{mat.totalPlannedFormatted}</td>
+                          <td className="text-right font-mono">{mat.totalActualFormatted}</td>
+                          <td className="text-right font-mono">{mat.diffFormatted}</td>
                         </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200 font-mono">
-                        {summaryMetrics.aggregatedMaterials.map((mat, i) => (
-                          <tr key={i}>
-                            <td className="py-2 px-3 font-sans font-semibold text-slate-900">{mat.name}</td>
-                            <td className="py-2 px-3 font-sans text-slate-600">{mat.unit}</td>
-                            <td className="py-2 px-3 text-right">{mat.totalPlannedFormatted}</td>
-                            <td className="py-2 px-3 text-right font-bold">{mat.totalActualFormatted}</td>
-                            <td className={`py-2 px-3 text-right font-bold ${mat.diffFormatted > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
-                              {mat.diffFormatted > 0 ? `+${mat.diffFormatted}` : mat.diffFormatted}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
 
-              {/* MODEL TEMPLATE 2: SERTIFIKAT SINGLE INSPECTION */}
               {printPreviewModal.type === 'SINGLE' && printPreviewModal.data && (
-                <div className="space-y-6">
-                  <div className="flex justify-between items-start bg-slate-50 p-4 rounded-lg border border-slate-200">
-                    <div className="space-y-1 text-xs">
-                      <div><strong className="text-slate-600">ID Inspeksi:</strong> <span className="font-mono font-bold text-slate-900">{printPreviewModal.data.id || printPreviewModal.data.docId}</span></div>
-                      <div><strong className="text-slate-600">Work Order (WO):</strong> {printPreviewModal.data.woNumber}</div>
-                      <div><strong className="text-slate-600">Sales Order (SO):</strong> {printPreviewModal.data.soNumber}</div>
-                      <div><strong className="text-slate-600">Customer:</strong> {printPreviewModal.data.customer}</div>
-                    </div>
-                    <div className="text-right text-xs space-y-1">
-                      <div><strong className="text-slate-600">Tanggal:</strong> {printPreviewModal.data.date}</div>
-                      <div><strong className="text-slate-600">Inspector:</strong> {printPreviewModal.data.inspector}</div>
-                      <div><strong className="text-slate-600">Shift:</strong> {printPreviewModal.data.shift}</div>
-                      <div className="pt-2">
-                        <span className={`px-3 py-1 rounded text-xs font-bold border ${
-                          printPreviewModal.data.overallStatus === 'PASS' 
-                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300' 
-                            : 'bg-rose-100 text-rose-800 border-rose-300'
-                        }`}>
-                          STATUS: {printPreviewModal.data.overallStatus}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h4 className="font-bold text-xs uppercase text-slate-800 mb-2 border-b pb-1">
-                      Detail Pemakaian Bahan Baku (BoM Actual vs Target)
-                    </h4>
-                    <table className="w-full text-xs text-left border-collapse">
-                      <thead>
-                        <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-300">
-                          <th className="py-2 px-2">Komponen</th>
-                          <th className="py-2 px-2 text-right">Target BoM</th>
-                          <th className="py-2 px-2 text-right">Aktual Lapangan</th>
-                          <th className="py-2 px-2 text-right">Deviasi</th>
-                          <th className="py-2 px-2 text-center">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200 font-mono">
-                        {printPreviewModal.data.bomComparison?.map((m, idx) => (
-                          <tr key={idx}>
-                            <td className="py-2 px-2 font-sans">{m.materialName}</td>
-                            <td className="py-2 px-2 text-right">{m.planned} {m.unit}</td>
-                            <td className="py-2 px-2 text-right font-bold">{m.actual} {m.unit}</td>
-                            <td className="py-2 px-2 text-right">{m.devPct}%</td>
-                            <td className="py-2 px-2 text-center font-sans font-bold">
-                              {m.status === 'OK' ? (
-                                <span className="text-emerald-700">OK</span>
-                              ) : (
-                                <span className="text-rose-700">{m.status}</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="bg-slate-50 p-3 rounded border border-slate-200 text-xs">
-                    <strong>Catatan QC & Evaluasi Otomatis:</strong>
-                    <p className="mt-1 text-slate-700 italic">{printPreviewModal.data.statusReason || 'Tidak ada catatan.'}</p>
+                <div className="space-y-4">
+                  <h4 className="font-bold text-xs uppercase text-slate-800 border-b pb-1">
+                    Sertifikat Inspeksi QC #{printPreviewModal.data.id || printPreviewModal.data.docId}
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div><strong>WO:</strong> {printPreviewModal.data.woNumber}</div>
+                    <div><strong>SO:</strong> {printPreviewModal.data.soNumber}</div>
+                    <div><strong>Customer:</strong> {printPreviewModal.data.customer}</div>
+                    <div><strong>Tanggal:</strong> {printPreviewModal.data.date}</div>
+                    <div><strong>Product:</strong> {printPreviewModal.data.productName}</div>
+                    <div><strong>Inspector:</strong> {printPreviewModal.data.inspector}</div>
                   </div>
                 </div>
               )}
-
-              {/* Signatures Footer */}
-              <div className="pt-12 grid grid-cols-2 gap-8 text-center text-xs">
-                <div>
-                  <div className="border-b border-slate-400 pb-12"></div>
-                  <p className="mt-2 font-bold text-slate-800">Inspector Quality Control</p>
-                </div>
-                <div>
-                  <div className="border-b border-slate-400 pb-12"></div>
-                  <p className="mt-2 font-bold text-slate-800">Head of Production / Supervisor</p>
-                </div>
-              </div>
             </div>
           </div>
         </div>
