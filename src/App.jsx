@@ -44,12 +44,12 @@ import {
 // Sesuaikan dengan kunci API/Config Firebase Anda
 // ==========================================
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID",
+  apiKey: "AIzaSyDRbtLQ8cDw936hT7-jd0RZWQoOA1-cI8U",
+  authDomain: "fabricaops.firebaseapp.com",
+  projectId: "fabricaops",
+  storageBucket: "fabricaops.firebasestorage.app",
+  messagingSenderId: "756784408812",
+  appId: "1:756784408812:web:378924ce02f5d82f861dc9",
 };
 
 const app = initializeApp(firebaseConfig);
