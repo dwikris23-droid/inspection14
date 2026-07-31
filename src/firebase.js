@@ -7,7 +7,7 @@ const firebaseConfig = {
   projectId: "fabricaops",
   storageBucket: "fabricaops.firebasestorage.app",
   messagingSenderId: "756784408812",
-  appId: "1:756784408812:web:378924ce02f5d82f861dc9"
+  appId: "1:756784408812:web:fd3e4fe11f95f455861dc9"
 };
 
 const app = initializeApp(firebaseConfig);
