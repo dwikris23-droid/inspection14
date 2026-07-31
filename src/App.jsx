@@ -1,61 +1,31 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { initializeApp } from 'firebase/app';
-import {
-  getFirestore,
-  collection,
-  onSnapshot,
-  doc,
-  setDoc,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  getDocs,
-} from 'firebase/firestore';
 import {
   ClipboardCheck,
   AlertTriangle,
   CheckCircle,
   XCircle,
   Search,
-  Plus,
-  Ruler,
-  Trash2,
   FileText,
   BarChart3,
   Package,
   ChevronRight,
   Eye,
   Printer,
+  Ruler,
+  Trash2,
+  Calculator,
+  ArrowRight,
   Settings,
   Sparkles,
   Edit3,
-  PlusCircle,
+  Plus,
   X,
   Calendar,
-  Download,
   Activity,
   RotateCcw,
-  Calculator,
-  ArrowRight,
 } from 'lucide-react';
 
-// ==========================================
-// 1. FIREBASE CONFIGURATION
-// ==========================================
-// Silakan ganti kredensial di bawah dengan konfigurasi Firebase Project Anda
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID",
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-// Dynamic Formula Evaluator Engine
+// Dynamic Formula Evaluator Engine (Support L, T, P, Q and JS math operators)
 const evaluateFormula = (formulaStr, params) => {
   try {
     const { L = 0, T = 0, P = 0, Q = 1 } = params;
@@ -251,120 +221,371 @@ const INITIAL_PRODUCT_TEMPLATES = [
     ],
     estWasteStandardPct: 3.5,
   },
+  {
+    id: 'PROD-BOX01',
+    name: 'Custom Box Karton Flute (P x L x T)',
+    category: 'Packaging',
+    defaultL: 30,
+    defaultT: 20,
+    defaultP: 15,
+    defaultQ: 100,
+    unitDim: 'cm',
+    bomFormulas: [
+      {
+        id: 'M1',
+        name: 'Lembaran Karton Corrugated B-Flute',
+        unit: 'm²',
+        formula: '(((2*L + 2*T + 5)*(P + T + 3))/10000) * Q',
+        tolerancePct: 4,
+        note: 'Luas bentangan sheet karton',
+      },
+      {
+        id: 'M2',
+        name: 'Lem Industri Cold Glue',
+        unit: 'Kg',
+        formula: '0.005 * Q',
+        tolerancePct: 5,
+        note: 'Lem sambungan kuping',
+      },
+      {
+        id: 'M3',
+        name: 'Tinta Cetak Waterbased',
+        unit: 'Kg',
+        formula: '0.002 * Q',
+        tolerancePct: 5,
+        note: 'Sablon logo & keterangan',
+      },
+    ],
+    soDimensionSpecs: [
+      {
+        id: 'S1',
+        name: 'Panjang Luar Box',
+        targetFormula: 'L',
+        minTol: -0.2,
+        maxTol: 0.2,
+        unit: 'cm',
+      },
+      {
+        id: 'S2',
+        name: 'Lebar Luar Box',
+        targetFormula: 'T',
+        minTol: -0.2,
+        maxTol: 0.2,
+        unit: 'cm',
+      },
+      {
+        id: 'S3',
+        name: 'Tinggi Luar Box',
+        targetFormula: 'P',
+        minTol: -0.2,
+        maxTol: 0.2,
+        unit: 'cm',
+      },
+    ],
+    estWasteStandardPct: 4.0,
+  },
+];
+
+const INITIAL_INSPECTIONS = [
+  {
+    id: 'INSP-2026-101',
+    date: '2026-07-29 09:30',
+    woNumber: 'WO-CUSTOM-8801',
+    soNumber: 'SO-IND-9912',
+    customer: 'PT Horizon Design Interior',
+    productName: 'Roller Blinds (RBO01 Blackout Series)',
+    dimInput: { L: 120, T: 200, P: 0, Q: 1, unitDim: 'cm' },
+    inspector: 'Deni Kurniawan (QC Lead)',
+    shift: 'Shift 1 - Pagi',
+    overallStatus: 'PASS',
+    statusReason:
+      'Semua pemakaian BoM hasil kalkulasi L120 T200 dan ukuran fisik sesuai toleransi SO.',
+    bomComparison: [
+      {
+        materialName: 'Kain RBO01 Blackout',
+        unit: 'm²',
+        planned: 2.63,
+        actual: 2.68,
+        devPct: 1.9,
+        formula: '((L-3)*(T+25))/10000',
+        status: 'OK',
+      },
+      {
+        materialName: 'Tube Aluminium 38mm',
+        unit: 'cm',
+        planned: 117,
+        actual: 117,
+        devPct: 0,
+        formula: 'L - 3',
+        status: 'OK',
+      },
+      {
+        materialName: 'Headrail Profile Top',
+        unit: 'cm',
+        planned: 117,
+        actual: 117,
+        devPct: 0,
+        formula: 'L - 3',
+        status: 'OK',
+      },
+      {
+        materialName: 'Bottom Rail Heavy Duty',
+        unit: 'cm',
+        planned: 117,
+        actual: 117,
+        devPct: 0,
+        formula: 'L - 3',
+        status: 'OK',
+      },
+      {
+        materialName: 'Roller Mechanism Set',
+        unit: 'Set',
+        planned: 1,
+        actual: 1,
+        devPct: 0,
+        formula: '1',
+        status: 'OK',
+      },
+      {
+        materialName: 'Bracket Mounting',
+        unit: 'Pcs',
+        planned: 2,
+        actual: 2,
+        devPct: 0,
+        formula: 'L > 150 ? 3 : 2',
+        status: 'OK',
+      },
+    ],
+    wasteAudit: {
+      reportedWaste: 0.15,
+      actualMeasuredWaste: 0.16,
+      wasteUnit: 'm²',
+      varianceWaste: 0.01,
+      variancePct: 6.67,
+      status: 'VERIFIED',
+      notes: 'Sisa potongan ujung kain rol normal.',
+    },
+    soDimensionCheck: [
+      {
+        specName: 'Lebar Akhir (L)',
+        target: 120,
+        unit: 'cm',
+        actual: 120.1,
+        status: 'PASS',
+        remark: 'Toleransi ±0.2 cm',
+      },
+      {
+        specName: 'Tinggi Akhir (T)',
+        target: 200,
+        unit: 'cm',
+        actual: 199.8,
+        status: 'PASS',
+        remark: 'Toleransi ±0.5 cm',
+      },
+      {
+        specName: 'Pemotongan Tube (Cut)',
+        target: 117,
+        unit: 'cm',
+        actual: 117.0,
+        status: 'PASS',
+        remark: 'In Spec',
+      },
+    ],
+  },
+  {
+    id: 'INSP-2026-102',
+    date: '2026-07-29 11:15',
+    woNumber: 'WO-CUSTOM-8802',
+    soNumber: 'SO-IND-9915',
+    customer: 'CV Sinar Megah Blinds',
+    productName: 'Roller Blinds (RBO01 Blackout Series)',
+    dimInput: { L: 180, T: 220, P: 0, Q: 2, unitDim: 'cm' },
+    inspector: 'Ahmad Zaky (QC Inspector)',
+    shift: 'Shift 1 - Pagi',
+    overallStatus: 'PASS',
+    statusReason: 'Pemakaian BoM akurat dan ukuran fisik masuk toleransi.',
+    bomComparison: [
+      {
+        materialName: 'Kain RBO01 Blackout',
+        unit: 'm²',
+        planned: 8.67,
+        actual: 8.85,
+        devPct: 2.07,
+        formula: '((L-3)*(T+25))/10000 * Q',
+        status: 'OK',
+      },
+      {
+        materialName: 'Tube Aluminium 38mm',
+        unit: 'cm',
+        planned: 354,
+        actual: 354,
+        devPct: 0,
+        formula: '(L - 3) * Q',
+        status: 'OK',
+      },
+      {
+        materialName: 'Bracket Mounting',
+        unit: 'Pcs',
+        planned: 6,
+        actual: 6,
+        devPct: 0,
+        formula: '3 * Q',
+        status: 'OK',
+      },
+    ],
+    wasteAudit: {
+      reportedWaste: 0.25,
+      actualMeasuredWaste: 0.28,
+      wasteUnit: 'm²',
+      varianceWaste: 0.03,
+      variancePct: 12.0,
+      status: 'VERIFIED',
+      notes: 'Waste terukur dalam ambang wajar.',
+    },
+    soDimensionCheck: [
+      {
+        specName: 'Lebar Akhir (L)',
+        target: 180,
+        unit: 'cm',
+        actual: 180.0,
+        status: 'PASS',
+        remark: 'Sesuai SO',
+      },
+      {
+        specName: 'Tinggi Akhir (T)',
+        target: 220,
+        unit: 'cm',
+        actual: 219.7,
+        status: 'PASS',
+        remark: 'Sesuai SO',
+      },
+    ],
+  },
+  {
+    id: 'INSP-2026-103',
+    date: '2026-07-28 15:40',
+    woNumber: 'WO-CUSTOM-8790',
+    soNumber: 'SO-KAY-3301',
+    customer: 'PT Arsitek Graha Utama',
+    productName: 'Zebra Blinds / Dual Shade Premium',
+    dimInput: { L: 160, T: 190, P: 0, Q: 1, unitDim: 'cm' },
+    inspector: 'Rian Hidayat (QC Officer)',
+    shift: 'Shift 2 - Siang',
+    overallStatus: 'CONDITIONAL',
+    statusReason:
+      'Terdapat sedikit pemborosan bahan kain Zebra (+5.2%), namun dimensi fisik produk lulus QC.',
+    bomComparison: [
+      {
+        materialName: 'Kain Zebra Stripe Dual',
+        unit: 'm²',
+        planned: 6.44,
+        actual: 6.8,
+        devPct: 5.59,
+        formula: '((L-3)*(T*2+30))/10000',
+        status: 'EXCEEDED',
+      },
+      {
+        materialName: 'Tube Aluminium Zebra 38mm',
+        unit: 'cm',
+        planned: 157,
+        actual: 157,
+        devPct: 0,
+        formula: 'L - 3',
+        status: 'OK',
+      },
+      {
+        materialName: 'Cassette Cover Box',
+        unit: 'cm',
+        planned: 159,
+        actual: 159,
+        devPct: 0,
+        formula: 'L - 1',
+        status: 'OK',
+      },
+    ],
+    wasteAudit: {
+      reportedWaste: 0.2,
+      actualMeasuredWaste: 0.35,
+      wasteUnit: 'm²',
+      varianceWaste: 0.15,
+      variancePct: 75.0,
+      status: 'DISCREPANCY_HIGH',
+      notes: 'Selisih waste terukur lebih tinggi dari laporan operator shift.',
+    },
+    soDimensionCheck: [
+      {
+        specName: 'Lebar Box Cassette',
+        target: 159,
+        unit: 'cm',
+        actual: 159.1,
+        status: 'PASS',
+        remark: 'In Spec',
+      },
+      {
+        specName: 'Tinggi Total Drop (T)',
+        target: 190,
+        unit: 'cm',
+        actual: 190.2,
+        status: 'PASS',
+        remark: 'In Spec',
+      },
+    ],
+  },
 ];
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('new_inspection');
-  const [productTemplates, setProductTemplates] = useState([]);
-  const [inspections, setInspections] = useState([]);
+  const [productTemplates, setProductTemplates] = useState(
+    INITIAL_PRODUCT_TEMPLATES
+  );
+  const [inspections, setInspections] = useState(INITIAL_INSPECTIONS);
   const [selectedInspection, setSelectedInspection] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
-  // Print Modal State
+  // PRINT / PDF PREVIEW MODAL STATE
   const [printPreviewModal, setPrintPreviewModal] = useState({
     isOpen: false,
     type: 'SUMMARY',
     data: null,
   });
 
-  // Search & Filters
+  // Search & Filters for History & Summary
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+
+  // RENTANG TANGGAL FILTER STATE
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  // Step Workflow
+  // STEP WORKFLOW STATE IN NEW INSPECTION
   const [inspectionStep, setInspectionStep] = useState(1);
 
-  // Form Inputs
-  const [selectedProductTemplateId, setSelectedProductTemplateId] = useState('');
+  // Product Selection & Custom Dimensions State
+  const [selectedProductTemplateId, setSelectedProductTemplateId] = useState(
+    productTemplates[0]?.id || ''
+  );
   const [woNumberInput, setWoNumberInput] = useState('WO-CUSTOM-2026-004');
   const [soNumberInput, setSoNumberInput] = useState('SO-CUST-88102');
-  const [customerInput, setCustomerInput] = useState('PT Decor Minimalis Indonesia');
+  const [customerInput, setCustomerInput] = useState(
+    'PT Decor Minimalis Indonesia'
+  );
   const [shiftInput, setShiftInput] = useState('Shift 1 - Pagi');
-  const [inspectorInput, setInspectorInput] = useState('Ahmad Zaky (QC Inspector)');
+  const [inspectorInput, setInspectorInput] = useState(
+    'Ahmad Zaky (QC Inspector)'
+  );
 
+  // Dimensions State
   const [dimL, setDimL] = useState(120);
   const [dimT, setDimT] = useState(200);
   const [dimP, setDimP] = useState(0);
   const [dimQ, setDimQ] = useState(1);
 
+  // Field Actuals Inputs
   const [actualBomUsage, setActualBomUsage] = useState({});
   const [reportedWasteVal, setReportedWasteVal] = useState('');
   const [actualWasteVal, setActualWasteVal] = useState('');
   const [actualDimensionsMeasured, setActualDimensionsMeasured] = useState({});
   const [inspectionNotes, setInspectionNotes] = useState('');
-
-  const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
-  const [newProductForm, setNewProductForm] = useState({
-    id: '',
-    name: '',
-    category: 'Window Blinds',
-    unitDim: 'cm',
-    defaultL: 100,
-    defaultT: 150,
-    defaultP: 0,
-    defaultQ: 1,
-    bomFormulas: [
-      {
-        id: 'M1',
-        name: 'Bahan Utama',
-        unit: 'm²',
-        formula: '((L-2)*(T+10))/10000',
-        tolerancePct: 3,
-        note: 'Formula bahan utama',
-      },
-    ],
-    soDimensionSpecs: [
-      {
-        id: 'S1',
-        name: 'Lebar Akhir (L)',
-        targetFormula: 'L',
-        minTol: -0.2,
-        maxTol: 0.2,
-        unit: 'cm',
-      },
-    ],
-    estWasteStandardPct: 3.0,
-  });
-
-  const showToast = (text, type = 'success') => {
-    setToastMessage({ text, type });
-    setTimeout(() => setToastMessage(null), 4000);
-  };
-
-  // ==========================================
-  // 2. FIREBASE REALTIME SYNC (INSPECTIONS & TEMPLATES)
-  // ==========================================
-  useEffect(() => {
-    // Sync Inspections Collection
-    const unsubscribeInspections = onSnapshot(collection(db, 'inspections'), (snapshot) => {
-      const docsData = snapshot.docs.map((d) => ({ firestoreId: d.id, ...d.data() }));
-      setInspections(docsData);
-    }, (err) => console.error("Firestore Inspections sync error:", err));
-
-    // Sync Product Templates Collection
-    const unsubscribeTemplates = onSnapshot(collection(db, 'product_templates'), (snapshot) => {
-      const docsData = snapshot.docs.map((d) => ({ firestoreId: d.id, ...d.data() }));
-      
-      // Jika koleksi templates di Firebase masih kosong, seed dari INITIAL_PRODUCT_TEMPLATES
-      if (docsData.length === 0) {
-        INITIAL_PRODUCT_TEMPLATES.forEach(async (tmpl) => {
-          await setDoc(doc(db, 'product_templates', tmpl.id), tmpl);
-        });
-      } else {
-        setProductTemplates(docsData);
-        if (!selectedProductTemplateId && docsData.length > 0) {
-          setSelectedProductTemplateId(docsData[0].id);
-        }
-      }
-    }, (err) => console.error("Firestore Templates sync error:", err));
-
-    return () => {
-      unsubscribeInspections();
-      unsubscribeTemplates();
-    };
-  }, []);
 
   const currentTemplate = useMemo(() => {
     return (
@@ -372,6 +593,11 @@ export default function App() {
       productTemplates[0]
     );
   }, [productTemplates, selectedProductTemplateId]);
+
+  const showToast = (text, type = 'success') => {
+    setToastMessage({ text, type });
+    setTimeout(() => setToastMessage(null), 4000);
+  };
 
   useEffect(() => {
     if (currentTemplate) {
@@ -382,82 +608,22 @@ export default function App() {
     }
   }, [selectedProductTemplateId, currentTemplate]);
 
-  // ==========================================
-  // 3. FIREBASE ACTIONS (DELETE INSPECTION)
-  // ==========================================
-  const handleDeleteInspection = async (id) => {
+  // ACTION: DELETE INSPECTION ITEM FROM HISTORY
+  const handleDeleteInspection = (id) => {
     if (window.confirm(`Apakah Anda yakin ingin menghapus data inspeksi ${id}?`)) {
-      try {
-        const itemToDelete = inspections.find((item) => item.id === id);
-        const docId = itemToDelete?.firestoreId || id;
-        
-        await deleteDoc(doc(db, 'inspections', docId));
-        
-        if (selectedInspection?.id === id) {
-          setSelectedInspection(null);
-        }
-        showToast(`Data inspeksi ${id} berhasil dihapus dari Firebase!`, 'error');
-      } catch (err) {
-        console.error("Gagal menghapus data inspeksi:", err);
-        showToast("Gagal menghapus data dari Firebase", "error");
+      setInspections((prev) => prev.filter((item) => item.id !== id));
+      if (selectedInspection?.id === id) {
+        setSelectedInspection(null);
       }
+      showToast(`Data inspeksi ${id} berhasil dihapus!`, 'error');
     }
   };
 
+  // ACTION: RESET DATE RANGE FILTER
   const handleResetDateFilter = () => {
     setStartDate('');
     setEndDate('');
     showToast('Filter rentang tanggal berhasil di-reset.');
-  };
-
-  const handleSaveNewProduct = async (e) => {
-    e.preventDefault();
-    if (!newProductForm.id || !newProductForm.name) {
-      showToast('Harap isi ID dan Nama Produk Template!', 'error');
-      return;
-    }
-
-    try {
-      await setDoc(doc(db, 'product_templates', newProductForm.id), newProductForm);
-      setSelectedProductTemplateId(newProductForm.id);
-      setIsAddProductModalOpen(false);
-      showToast(`Template produk ${newProductForm.name} berhasil disimpan ke Firebase!`);
-
-      setNewProductForm({
-        id: '',
-        name: '',
-        category: 'Window Blinds',
-        unitDim: 'cm',
-        defaultL: 100,
-        defaultT: 150,
-        defaultP: 0,
-        defaultQ: 1,
-        bomFormulas: [
-          {
-            id: 'M1',
-            name: 'Bahan Utama',
-            unit: 'm²',
-            formula: '((L-2)*(T+10))/10000',
-            tolerancePct: 3,
-            note: 'Formula bahan utama',
-          },
-        ],
-        soDimensionSpecs: [
-          {
-            id: 'S1',
-            name: 'Lebar Akhir (L)',
-            targetFormula: 'L',
-            minTol: -0.2,
-            maxTol: 0.2,
-            unit: 'cm',
-          },
-        ],
-        estWasteStandardPct: 3.0,
-      });
-    } catch (err) {
-      console.error("Error saving new template:", err);
-      showToast("Gagal menyimpan template baru", "error");
-    }
   };
 
   const calculatedTargetBom = useMemo(() => {
@@ -631,16 +797,12 @@ export default function App() {
     actualDimensionsMeasured,
   ]);
 
-  // ==========================================
-  // 4. SAVE NEW INSPECTION TO FIREBASE
-  // ==========================================
-  const handleSubmitInspection = async (e) => {
+  const handleSubmitInspection = (e) => {
     e.preventDefault();
     if (!auditEvaluation) return;
 
-    const customId = `INSP-2026-${String(inspections.length + 101).padStart(3, '0')}`;
     const newInspectionRecord = {
-      id: customId,
+      id: `INSP-2026-${String(inspections.length + 101).padStart(3, '0')}`,
       date: new Date().toISOString().replace('T', ' ').substring(0, 16),
       woNumber: woNumberInput,
       soNumber: soNumberInput,
@@ -676,97 +838,76 @@ export default function App() {
       soDimensionCheck: auditEvaluation.specDetails,
     };
 
-    try {
-      await addDoc(collection(db, 'inspections'), newInspectionRecord);
-      showToast(
-        `Inspeksi ${newInspectionRecord.id} berhasil disimpan ke Firebase! Status: ${newInspectionRecord.overallStatus}`,
-        newInspectionRecord.overallStatus === 'PASS' ? 'success' : 'error'
-      );
-      setInspectionStep(1);
-      setActiveTab('summary');
-    } catch (err) {
-      console.error("Error saving inspection record:", err);
-      showToast("Gagal menyimpan data inspeksi", "error");
-    }
+    setInspections([newInspectionRecord, ...inspections]);
+    showToast(
+      `Inspeksi ${newInspectionRecord.id} berhasil disimpan! Status: ${newInspectionRecord.overallStatus}`,
+      newInspectionRecord.overallStatus === 'PASS' ? 'success' : 'error'
+    );
+
+    setInspectionStep(1);
+    setActiveTab('summary');
   };
 
-  // ==========================================
-  // 5. UPDATE & DELETE BOM FORMULAS IN FIREBASE
-  // ==========================================
-  const handleUpdateFormulaItem = async (tmplId, formulaId, updatedField, value) => {
-    const tmplToUpdate = productTemplates.find((t) => t.id === tmplId);
-    if (!tmplToUpdate) return;
-
-    const updatedBom = tmplToUpdate.bomFormulas.map((f) => {
-      if (f.id !== formulaId) return f;
-      return { ...f, [updatedField]: value };
+  const handleUpdateFormulaItem = (tmplId, formulaId, updatedField, value) => {
+    setProductTemplates((prevTemplates) => {
+      return prevTemplates.map((tmpl) => {
+        if (tmpl.id !== tmplId) return tmpl;
+        const updatedBom = tmpl.bomFormulas.map((f) => {
+          if (f.id !== formulaId) return f;
+          return { ...f, [updatedField]: value };
+        });
+        return { ...tmpl, bomFormulas: updatedBom };
+      });
     });
-
-    try {
-      await updateDoc(doc(db, 'product_templates', tmplId), {
-        bomFormulas: updatedBom,
-      });
-      showToast('Rumus BoM berhasil diperbarui di Firebase!');
-    } catch (err) {
-      console.error("Error updating formula:", err);
-      showToast("Gagal memperbarui formula", "error");
-    }
+    showToast('Rumus BoM berhasil diperbarui!');
   };
 
-  const handleAddFormulaRow = async (tmplId) => {
-    const tmplToUpdate = productTemplates.find((t) => t.id === tmplId);
-    if (!tmplToUpdate) return;
-
-    const newId = `M${tmplToUpdate.bomFormulas.length + 1}`;
-    const newRow = {
-      id: newId,
-      name: 'Komponen Baru',
-      unit: 'Pcs',
-      formula: '1',
-      tolerancePct: 2,
-      note: 'Komponen tambahan',
-    };
-
-    try {
-      await updateDoc(doc(db, 'product_templates', tmplId), {
-        bomFormulas: [...tmplToUpdate.bomFormulas, newRow],
+  const handleAddFormulaRow = (tmplId) => {
+    setProductTemplates((prevTemplates) => {
+      return prevTemplates.map((tmpl) => {
+        if (tmpl.id !== tmplId) return tmpl;
+        const newId = `M${tmpl.bomFormulas.length + 1}`;
+        const newRow = {
+          id: newId,
+          name: 'Komponen Baru',
+          unit: 'Pcs',
+          formula: '1',
+          tolerancePct: 2,
+          note: 'Komponen tambahan',
+        };
+        return { ...tmpl, bomFormulas: [...tmpl.bomFormulas, newRow] };
       });
-      showToast('Komponen BoM baru ditambahkan di Firebase!');
-    } catch (err) {
-      console.error("Error adding formula row:", err);
-      showToast("Gagal menambah komponen BoM", "error");
-    }
+    });
+    showToast('Komponen BoM baru ditambahkan!');
   };
 
-  const handleDeleteFormulaRow = async (tmplId, formulaId) => {
-    const tmplToUpdate = productTemplates.find((t) => t.id === tmplId);
-    if (!tmplToUpdate) return;
-
-    const filteredBom = tmplToUpdate.bomFormulas.filter((f) => f.id !== formulaId);
-
-    try {
-      await updateDoc(doc(db, 'product_templates', tmplId), {
-        bomFormulas: filteredBom,
+  const handleDeleteFormulaRow = (tmplId, formulaId) => {
+    setProductTemplates((prevTemplates) => {
+      return prevTemplates.map((tmpl) => {
+        if (tmpl.id !== tmplId) return tmpl;
+        return {
+          ...tmpl,
+          bomFormulas: tmpl.bomFormulas.filter((f) => f.id !== formulaId),
+        };
       });
-      showToast('Komponen BoM berhasil dihapus dari Firebase!');
-    } catch (err) {
-      console.error("Error deleting formula row:", err);
-      showToast("Gagal menghapus komponen BoM", "error");
-    }
+    });
+    showToast('Komponen BoM dihapus!');
   };
 
+  // Filtered Inspections for History & Summary by Search, Status, and Date Range
   const filteredInspections = useMemo(() => {
     return inspections.filter((item) => {
       const matchesSearch =
-        (item.id && item.id.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (item.woNumber && item.woNumber.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (item.customer && item.customer.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (item.productName && item.productName.toLowerCase().includes(searchQuery.toLowerCase()));
+        item.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.woNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.productName.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesStatus =
         statusFilter === 'ALL' || item.overallStatus === statusFilter;
 
-      const itemDateStr = item.date ? item.date.substring(0, 10) : '';
+      // Extract date string "YYYY-MM-DD"
+      const itemDateStr = item.date.substring(0, 10);
       let matchesDateRange = true;
 
       if (startDate) {
@@ -780,6 +921,7 @@ export default function App() {
     });
   }, [inspections, searchQuery, statusFilter, startDate, endDate]);
 
+  // COMPUTE EXECUTIVE SUMMARY & AGGREGATED BOM REKAP DATA BASED ON FILTERED INSPECTIONS
   const summaryMetrics = useMemo(() => {
     const totalInspections = filteredInspections.length;
     if (totalInspections === 0) return null;
@@ -796,8 +938,6 @@ export default function App() {
     const passRate = ((passCount / totalInspections) * 100).toFixed(1);
 
     const materialMap = {};
-    let totalPlannedUnits = 0;
-    let totalActualUnits = 0;
 
     filteredInspections.forEach((record) => {
       if (record.bomComparison && Array.isArray(record.bomComparison)) {
@@ -819,9 +959,6 @@ export default function App() {
           if (mat.status === 'EXCEEDED') {
             materialMap[key].exceededCount += 1;
           }
-
-          totalPlannedUnits += parseFloat(mat.planned) || 0;
-          totalActualUnits += parseFloat(mat.actual) || 0;
         });
       }
     });
@@ -853,6 +990,24 @@ export default function App() {
 
     const netWasteVariance = totalActualWaste - totalReportedWaste;
 
+    const shiftMap = {};
+    filteredInspections.forEach((r) => {
+      const s = r.shift || 'Shift 1 - Pagi';
+      if (!shiftMap[s]) {
+        shiftMap[s] = {
+          shift: s,
+          total: 0,
+          pass: 0,
+          conditional: 0,
+          reject: 0,
+        };
+      }
+      shiftMap[s].total += 1;
+      if (r.overallStatus === 'PASS') shiftMap[s].pass += 1;
+      if (r.overallStatus === 'CONDITIONAL') shiftMap[s].conditional += 1;
+      if (r.overallStatus === 'REJECT') shiftMap[s].reject += 1;
+    });
+
     return {
       totalInspections,
       passCount,
@@ -868,29 +1023,6 @@ export default function App() {
       },
     };
   }, [filteredInspections]);
-
-  const handleExportCSV = () => {
-    if (filteredInspections.length === 0) {
-      showToast('Tidak ada data untuk diekspor!', 'error');
-      return;
-    }
-
-    let csvContent = 'data:text/csv;charset=utf-8,';
-    csvContent += 'ID Inspeksi,Tanggal,WO Number,SO Number,Customer,Produk,Status,Inspector\n';
-
-    filteredInspections.forEach((row) => {
-      csvContent += `"${row.id}","${row.date}","${row.woNumber}","${row.soNumber}","${row.customer}","${row.productName}","${row.overallStatus}","${row.inspector}"\n`;
-    });
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `QC_Report_${new Date().toISOString().substring(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast('Data berhasil diekspor ke format CSV!');
-  };
 
   const triggerPrintSummaryReport = () => {
     setPrintPreviewModal({
@@ -916,15 +1048,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans antialiased flex flex-col selection:bg-indigo-500 selection:text-white">
-      <style>{`
-        @media print {
-          .no-print, header, nav, button { display: none !important; }
-          body { background-color: white !important; color: black !important; }
-          .printable-modal-overlay { position: absolute !important; inset: 0 !important; background: white !important; p: 0 !important; }
-          .printable-document { border: none !important; box-shadow: none !important; }
-        }
-      `}</style>
-
       {/* Toast Alert */}
       {toastMessage && (
         <div
@@ -955,7 +1078,7 @@ export default function App() {
                 <h1 className="font-bold text-lg text-white tracking-wide flex items-center gap-2">
                   OP-INSPECT{' '}
                   <span className="text-xs px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-400 font-mono border border-indigo-500/30">
-                    Firebase Live
+                    Custom BoM v3.5
                   </span>
                 </h1>
                 <p className="text-xs text-slate-400">
@@ -1014,10 +1137,12 @@ export default function App() {
             <div className="p-6 rounded-2xl bg-slate-800 border border-slate-700 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Calculator className="w-6 h-6 text-indigo-400" /> Form Inspeksi Produk Custom & BoM Calculator
+                  <Calculator className="w-6 h-6 text-indigo-400" /> Form
+                  Inspeksi Produk Custom & BoM Calculator
                 </h2>
                 <p className="text-xs text-slate-400 mt-1">
-                  <b>Logika Inspeksi:</b> Step 1 Input Ukuran Produk → Sistem Hitung BoM Standar → Step 2 Input Realisasi Lapangan.
+                  <b>Logika Inspeksi:</b> Step 1 Input Ukuran Produk → Sistem
+                  Hitung BoM Standar → Step 2 Input Realisasi Lapangan.
                 </p>
               </div>
 
@@ -1060,7 +1185,8 @@ export default function App() {
                 <div className="p-6 rounded-2xl bg-slate-800 border border-slate-700 space-y-4">
                   <div className="flex justify-between items-center">
                     <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-2">
-                      <Package className="w-4 h-4" /> Informasi Order & Model Produk Custom
+                      <Package className="w-4 h-4" /> Informasi Order & Model
+                      Produk Custom
                     </h3>
                   </div>
 
@@ -1125,7 +1251,8 @@ export default function App() {
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="text-base font-bold text-white flex items-center gap-2">
-                        <Ruler className="w-5 h-5 text-indigo-400" /> Input Dimensi Spesifikasi Produk (Ukuran SO)
+                        <Ruler className="w-5 h-5 text-indigo-400" /> Input
+                        Dimensi Spesifikasi Produk (Ukuran SO)
                       </h3>
                     </div>
                     <span className="text-xs font-mono font-bold text-indigo-300 bg-indigo-500/20 px-3 py-1 rounded-full border border-indigo-500/30">
@@ -1195,7 +1322,8 @@ export default function App() {
                 <div className="p-6 rounded-2xl bg-slate-800 border border-slate-700 space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-700 pb-3">
                     <h3 className="font-bold text-white text-base flex items-center gap-2">
-                      <Sparkles className="w-5 h-5 text-indigo-400" /> Hasil Kalkulasi Otomatis BoM Standar
+                      <Sparkles className="w-5 h-5 text-indigo-400" /> Hasil
+                      Kalkulasi Otomatis BoM Standar
                     </h3>
                   </div>
 
@@ -1251,7 +1379,10 @@ export default function App() {
             )}
 
             {inspectionStep === 2 && (
-              <form onSubmit={handleSubmitInspection} className="space-y-6 animate-fadeIn">
+              <form
+                onSubmit={handleSubmitInspection}
+                className="space-y-6 animate-fadeIn"
+              >
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-5 rounded-2xl bg-slate-800 border border-slate-700 text-xs">
                   <div>
                     <span className="text-slate-400 block">Produk:</span>
@@ -1346,7 +1477,7 @@ export default function App() {
 
                 <div className="p-6 rounded-2xl bg-slate-800 border border-slate-700 space-y-4">
                   <h3 className="font-bold text-white text-base">
-                    2. Audit Waste & Catatan Inspeksi
+                    2. Audit Waste
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -1378,14 +1509,13 @@ export default function App() {
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-slate-300 block mb-1">
-                      Catatan QC Inspeksi Tambahan:
+                      Catatan Tambahan Inspeksi:
                     </label>
                     <textarea
-                      rows={2}
                       value={inspectionNotes}
                       onChange={(e) => setInspectionNotes(e.target.value)}
-                      placeholder="Masukkan catatan pendukung (opsional)..."
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                      placeholder="Masukkan catatan jika ada deviasi khusus..."
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none h-20"
                     />
                   </div>
                 </div>
@@ -1396,7 +1526,7 @@ export default function App() {
                     className="py-3 px-6 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white font-bold text-sm shadow-lg shadow-indigo-500/25 transition-all flex items-center space-x-2"
                   >
                     <ClipboardCheck className="w-5 h-5" />
-                    <span>Simpan Hasil Inspeksi (Firebase)</span>
+                    <span>Simpan Hasil Inspeksi</span>
                   </button>
                 </div>
               </form>
@@ -1410,7 +1540,8 @@ export default function App() {
             <div className="p-6 rounded-2xl bg-gradient-to-r from-slate-800 via-indigo-950/60 to-slate-800 border border-slate-700 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <FileText className="w-6 h-6 text-indigo-400" /> Ringkasan & Rekapitulasi Laporan QC Operasional
+                  <FileText className="w-6 h-6 text-indigo-400" /> Ringkasan &
+                  Rekapitulasi Laporan QC Operasional
                 </h2>
                 <p className="text-xs text-slate-300 mt-1">
                   Akumulasi total konsumsi bahan baku dan audit waste berdasarkan filter rentang tanggal.
@@ -1418,13 +1549,6 @@ export default function App() {
               </div>
 
               <div className="flex items-center space-x-3">
-                <button
-                  onClick={handleExportCSV}
-                  className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 flex items-center space-x-2 transition-all"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Ekspor CSV / Excel</span>
-                </button>
                 <button
                   onClick={triggerPrintSummaryReport}
                   className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 flex items-center space-x-2 transition-all"
@@ -1435,6 +1559,7 @@ export default function App() {
               </div>
             </div>
 
+            {/* BARIS TRIGGER FILTER RENTANG TANGGAL */}
             <div className="p-4 rounded-2xl bg-slate-800 border border-slate-700 flex flex-wrap items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-3 text-xs">
                 <div className="flex items-center space-x-2">
@@ -1462,6 +1587,7 @@ export default function App() {
                   />
                 </div>
 
+                {/* TOMBOL TRIGGER RESET FILTER TANGGAL */}
                 {(startDate || endDate) && (
                   <button
                     onClick={handleResetDateFilter}
@@ -1482,6 +1608,7 @@ export default function App() {
               </div>
             </div>
 
+            {/* KPI Summary Cards */}
             {summaryMetrics ? (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="p-5 rounded-2xl bg-slate-800 border border-slate-700 shadow-sm flex items-center justify-between">
@@ -1546,6 +1673,7 @@ export default function App() {
               </div>
             )}
 
+            {/* REKAP TABLE */}
             {summaryMetrics && (
               <div className="p-6 rounded-2xl bg-slate-800 border border-slate-700 space-y-4">
                 <h3 className="font-bold text-white text-base">
@@ -1642,7 +1770,7 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 4: RIWAYAT AUDIT (HANYA MENGHAPUS DUMMY INSPECTION DARI FIREBASE) */}
+        {/* TAB 4: RIWAYAT AUDIT */}
         {activeTab === 'history' && (
           <div className="space-y-6 animate-fadeIn">
             <div className="flex flex-col lg:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-slate-800 border border-slate-700">
@@ -1657,6 +1785,7 @@ export default function App() {
                 />
               </div>
 
+              {/* FILTER RENTANG TANGGAL DI RIWAYAT */}
               <div className="flex flex-wrap items-center gap-3 text-xs w-full lg:w-auto">
                 <div className="flex items-center space-x-1">
                   <Calendar className="w-4 h-4 text-indigo-400" />
@@ -1756,7 +1885,7 @@ export default function App() {
                             <Eye className="w-4 h-4" />
                           </button>
 
-                          {/* ACTION DELETE RECORD INSPEKSI DARI FIREBASE */}
+                          {/* TOMBOL TRIGGER HAPUS ITEM HISTORI */}
                           <button
                             onClick={() => handleDeleteInspection(item.id)}
                             className="p-1.5 bg-rose-600/20 hover:bg-rose-600 rounded-lg text-rose-300 hover:text-white border border-rose-500/30 transition-all"
@@ -1769,7 +1898,10 @@ export default function App() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={5} className="py-8 text-center text-slate-400 italic">
+                      <td
+                        colSpan={5}
+                        className="py-8 text-center text-slate-400 italic"
+                      >
                         Tidak ada riwayat data inspeksi yang ditemukan.
                       </td>
                     </tr>
@@ -1780,22 +1912,16 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 5: MASTER FORMULA EDITOR (MEMUNGKINKAN HAPUS FORMULA BOM DARI FIREBASE) */}
+        {/* TAB 5: MASTER FORMULA EDITOR */}
         {activeTab === 'formulas' && (
           <div className="space-y-6 animate-fadeIn">
             <div className="p-6 rounded-2xl bg-slate-800 border border-slate-700 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Settings className="w-6 h-6 text-indigo-400" /> Master Formula & Editor BoM Custom
+                  <Settings className="w-6 h-6 text-indigo-400" /> Master
+                  Formula & Editor BoM Custom
                 </h2>
               </div>
-              <button
-                onClick={() => setIsAddProductModalOpen(true)}
-                className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white font-bold text-xs rounded-xl flex items-center gap-2 shadow-lg transition-all"
-              >
-                <PlusCircle className="w-4 h-4" />
-                <span>Tambah Template Produk Baru</span>
-              </button>
             </div>
 
             <div className="space-y-6">
@@ -1833,7 +1959,7 @@ export default function App() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-700/60 font-mono">
-                        {tmpl.bomFormulas?.map((f) => (
+                        {tmpl.bomFormulas.map((f) => (
                           <tr key={f.id} className="hover:bg-slate-750">
                             <td className="py-2.5 px-3 font-sans">
                               <input
@@ -1881,13 +2007,11 @@ export default function App() {
                               />
                             </td>
                             <td className="py-2.5 px-3 text-right">
-                              {/* ACTION DELETE FORMULA BOM DARI FIREBASE */}
                               <button
                                 onClick={() =>
                                   handleDeleteFormulaRow(tmpl.id, f.id)
                                 }
                                 className="p-1 rounded bg-rose-500/20 hover:bg-rose-600 text-rose-300 hover:text-white transition-all"
-                                title="Hapus Formula BoM"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -1904,131 +2028,7 @@ export default function App() {
         )}
       </main>
 
-      {/* MODALS */}
-      {selectedInspection && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex justify-center items-center p-4">
-          <div className="bg-slate-800 border border-slate-700 text-white rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl relative">
-            <button
-              onClick={() => setSelectedInspection(null)}
-              className="absolute top-4 right-4 p-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 hover:text-white"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="flex items-center space-x-3 border-b border-slate-700 pb-3">
-              <ClipboardCheck className="w-6 h-6 text-indigo-400" />
-              <div>
-                <h3 className="font-bold text-lg">{selectedInspection.id}</h3>
-                <p className="text-xs text-slate-400">{selectedInspection.date} | {selectedInspection.inspector}</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div><strong className="text-slate-400">WO / SO:</strong> {selectedInspection.woNumber} / {selectedInspection.soNumber}</div>
-              <div><strong className="text-slate-400">Customer:</strong> {selectedInspection.customer}</div>
-              <div className="col-span-2"><strong className="text-slate-400">Produk:</strong> {selectedInspection.productName}</div>
-              <div className="col-span-2"><strong className="text-slate-400">Catatan QC:</strong> {selectedInspection.statusReason}</div>
-            </div>
-
-            <div className="pt-2">
-              <h4 className="font-bold text-xs uppercase text-indigo-300 mb-2">Perbandingan BoM</h4>
-              <div className="bg-slate-900 rounded-xl p-3 max-h-48 overflow-y-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="text-slate-400 border-b border-slate-800">
-                    <tr>
-                      <th className="pb-1">Bahan</th>
-                      <th className="pb-1">Target</th>
-                      <th className="pb-1">Aktual</th>
-                      <th className="pb-1">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800 font-mono">
-                    {selectedInspection.bomComparison?.map((m, idx) => (
-                      <tr key={idx}>
-                        <td className="py-1 font-sans">{m.materialName}</td>
-                        <td className="py-1">{m.planned} {m.unit}</td>
-                        <td className="py-1">{m.actual} {m.unit}</td>
-                        <td className="py-1">
-                          <span className={m.status === 'OK' ? 'text-emerald-400' : 'text-rose-400'}>{m.status}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isAddProductModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex justify-center items-center p-4">
-          <form onSubmit={handleSaveNewProduct} className="bg-slate-800 border border-slate-700 text-white rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl relative">
-            <button
-              type="button"
-              onClick={() => setIsAddProductModalOpen(false)}
-              className="absolute top-4 right-4 p-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 hover:text-white"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <h3 className="font-bold text-lg flex items-center gap-2 text-indigo-400">
-              <PlusCircle className="w-5 h-5" /> Tambah Template Produk Custom Baru
-            </h3>
-
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div>
-                <label className="text-slate-400 block mb-1">ID Produk Custom (Unik):</label>
-                <input
-                  type="text"
-                  placeholder="misal: PROD-WOOD01"
-                  value={newProductForm.id}
-                  onChange={(e) => setNewProductForm({...newProductForm, id: e.target.value})}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white font-mono"
-                  required
-                />
-              </div>
-              <div>
-                <label className="text-slate-400 block mb-1">Kategori Produk:</label>
-                <input
-                  type="text"
-                  value={newProductForm.category}
-                  onChange={(e) => setNewProductForm({...newProductForm, category: e.target.value})}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white"
-                />
-              </div>
-              <div className="col-span-2">
-                <label className="text-slate-400 block mb-1">Nama Deskripsi Produk:</label>
-                <input
-                  type="text"
-                  placeholder="misal: Wooden Blinds 50mm Premium Series"
-                  value={newProductForm.name}
-                  onChange={(e) => setNewProductForm({...newProductForm, name: e.target.value})}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="pt-2 flex justify-end space-x-2">
-              <button
-                type="button"
-                onClick={() => setIsAddProductModalOpen(false)}
-                className="px-4 py-2 bg-slate-700 text-slate-300 text-xs rounded-xl font-bold"
-              >
-                Batal
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded-xl font-bold shadow-lg"
-              >
-                Simpan Template Produk
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
+      {/* MODAL PRINT PREVIEW */}
       {printPreviewModal.isOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex justify-center items-start overflow-y-auto p-4 printable-modal-overlay">
           <div className="bg-white text-slate-900 rounded-xl max-w-4xl w-full shadow-2xl overflow-hidden my-6 border border-slate-300 printable-document animate-fadeIn">
@@ -2067,7 +2067,7 @@ export default function App() {
                     FABRICA INDONESIA
                   </h1>
                   <p className="text-xs text-slate-600">
-                    Sistem Inspeksi QC & BoM Custom (Firebase Integrated)
+                    Sistem Inspeksi QC & BoM Custom
                   </p>
                 </div>
               </div>
@@ -2079,26 +2079,26 @@ export default function App() {
                   </h4>
                   <table className="w-full text-xs">
                     <thead>
-                      <tr>
-                        <th>Bahan Baku</th>
-                        <th>Satuan</th>
-                        <th className="text-right">Total Target</th>
-                        <th className="text-right">Total Aktual</th>
-                        <th className="text-right">Selisih</th>
+                      <tr className="border-b">
+                        <th className="py-2 text-left">Bahan Baku</th>
+                        <th className="py-2 text-left">Satuan</th>
+                        <th className="py-2 text-right">Total Target</th>
+                        <th className="py-2 text-right">Total Aktual</th>
+                        <th className="py-2 text-right">Selisih</th>
                       </tr>
                     </thead>
                     <tbody>
                       {summaryMetrics.aggregatedMaterials.map((mat, i) => (
-                        <tr key={i}>
-                          <td className="font-bold">{mat.name}</td>
-                          <td>{mat.unit}</td>
-                          <td className="text-right font-mono">
+                        <tr key={i} className="border-b">
+                          <td className="py-2 font-bold">{mat.name}</td>
+                          <td className="py-2">{mat.unit}</td>
+                          <td className="py-2 text-right font-mono">
                             {mat.totalPlannedFormatted}
                           </td>
-                          <td className="text-right font-mono">
+                          <td className="py-2 text-right font-mono">
                             {mat.totalActualFormatted}
                           </td>
-                          <td className="text-right font-mono">{mat.diffFormatted}</td>
+                          <td className="py-2 text-right font-mono">{mat.diffFormatted}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -2108,16 +2108,22 @@ export default function App() {
 
               {printPreviewModal.type === 'SINGLE' && printPreviewModal.data && (
                 <div className="space-y-4">
-                  <h4 className="font-bold text-xs uppercase text-slate-800 border-b pb-1">
-                    Sertifikat Inspeksi QC #{printPreviewModal.data.id}
-                  </h4>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div><strong>WO:</strong> {printPreviewModal.data.woNumber}</div>
-                    <div><strong>SO:</strong> {printPreviewModal.data.soNumber}</div>
-                    <div><strong>Customer:</strong> {printPreviewModal.data.customer}</div>
-                    <div><strong>Tanggal:</strong> {printPreviewModal.data.date}</div>
-                    <div><strong>Product:</strong> {printPreviewModal.data.productName}</div>
-                    <div><strong>Inspector:</strong> {printPreviewModal.data.inspector}</div>
+                  <div className="grid grid-cols-2 text-xs gap-2">
+                    <div>
+                      <strong>No. ID:</strong> {printPreviewModal.data.id}
+                    </div>
+                    <div>
+                      <strong>Tanggal:</strong> {printPreviewModal.data.date}
+                    </div>
+                    <div>
+                      <strong>WO / SO:</strong> {printPreviewModal.data.woNumber} / {printPreviewModal.data.soNumber}
+                    </div>
+                    <div>
+                      <strong>Customer:</strong> {printPreviewModal.data.customer}
+                    </div>
+                    <div>
+                      <strong>Status QC:</strong> {printPreviewModal.data.overallStatus}
+                    </div>
                   </div>
                 </div>
               )}
@@ -2125,6 +2131,31 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Global CSS Print Styles */}
+      <style>{`
+        @media print {
+          .no-print {
+            display: none !important;
+          }
+          body {
+            background-color: white !important;
+            color: black !important;
+          }
+          .printable-modal-overlay {
+            position: absolute !important;
+            inset: 0 !important;
+            background: white !important;
+            padding: 0 !important;
+          }
+          .printable-document {
+            border: none !important;
+            box-shadow: none !important;
+            max-width: 100% !important;
+            width: 100% !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }
