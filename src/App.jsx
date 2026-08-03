@@ -7,8 +7,10 @@ import {
   AlertTriangle,
   CheckCircle,
   XCircle,
+  Plus,
   Layers,
   Ruler,
+  Trash2,
   FileText,
   BarChart3,
   Package,
@@ -18,6 +20,7 @@ import {
   Check,
   Calculator,
   ArrowRight,
+  Settings,
   Sparkles,
   Scissors,
   Edit3,
@@ -451,6 +454,53 @@ export default function App() {
     }
   };
 
+  // Fungsi Master Formula Editor
+  const handleUpdateFormulaItem = (tmplId, formulaId, updatedField, value) => {
+    setProductTemplates((prevTemplates) => {
+      return prevTemplates.map((tmpl) => {
+        if (tmpl.id !== tmplId) return tmpl;
+        const updatedBom = tmpl.bomFormulas.map((f) => {
+          if (f.id !== formulaId) return f;
+          return { ...f, [updatedField]: value };
+        });
+        return { ...tmpl, bomFormulas: updatedBom };
+      });
+    });
+    showToast('Rumus BoM berhasil diperbarui!');
+  };
+
+  const handleAddFormulaRow = (tmplId) => {
+    setProductTemplates((prevTemplates) => {
+      return prevTemplates.map((tmpl) => {
+        if (tmpl.id !== tmplId) return tmpl;
+        const newId = `M${tmpl.bomFormulas.length + 1}`;
+        const newRow = {
+          id: newId,
+          name: 'Komponen Baru',
+          unit: 'Pcs',
+          formula: '1',
+          tolerancePct: 2,
+          note: 'Komponen tambahan',
+        };
+        return { ...tmpl, bomFormulas: [...tmpl.bomFormulas, newRow] };
+      });
+    });
+    showToast('Komponen BoM baru ditambahkan!');
+  };
+
+  const handleDeleteFormulaRow = (tmplId, formulaId) => {
+    setProductTemplates((prevTemplates) => {
+      return prevTemplates.map((tmpl) => {
+        if (tmpl.id !== tmplId) return tmpl;
+        return {
+          ...tmpl,
+          bomFormulas: tmpl.bomFormulas.filter((f) => f.id !== formulaId),
+        };
+      });
+    });
+    showToast('Komponen BoM dihapus!');
+  };
+
   const handleCreateNewProduct = (e) => {
     e.preventDefault();
     if (!newProductForm.name || !newProductForm.id) {
@@ -648,7 +698,7 @@ export default function App() {
         </div>
       )}
 
-      {/* HEADER NAVBAR (HANYA 3 TAB UTAMA) */}
+      {/* HEADER NAVBAR (4 TAB UTAMA DENGAN MASTER FORMULA) */}
       <header className="bg-slate-800/90 backdrop-blur-md border-b border-slate-700/80 sticky top-0 z-40 no-print">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -669,6 +719,7 @@ export default function App() {
                 { id: 'new_inspection', label: '+ Inspeksi & BoM Calc', icon: Calculator },
                 { id: 'summary', label: '📊 Summary & Rekap Laporan', icon: FileText },
                 { id: 'dashboard', label: 'Dashboard & KPI Shift', icon: BarChart3 },
+                { id: 'formulas', label: 'Master Formula & BoM Editor', icon: Settings },
               ].map((tab) => {
                 const Icon = tab.icon;
                 const active = activeTab === tab.id;
@@ -1238,7 +1289,7 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 3: DASHBOARD & KPI PER SHIFT (DIKEMBALIKAN LENGKAP) */}
+        {/* TAB 3: DASHBOARD & KPI PER SHIFT */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6 animate-fadeIn">
             <div className="p-6 rounded-2xl bg-slate-800 border border-slate-700 shadow-xl">
@@ -1250,7 +1301,6 @@ export default function App() {
               </p>
             </div>
 
-            {/* RINGKASAN UTAMA OPERASIONAL */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="p-5 rounded-2xl bg-slate-800 border border-slate-700 shadow-sm">
                 <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Inspeksi Data</span>
@@ -1270,7 +1320,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* KARTU BREAKDOWN KPI PER SHIFT */}
             <div className="space-y-4">
               <h3 className="font-bold text-white text-base flex items-center gap-2">
                 <Users className="w-5 h-5 text-indigo-400" /> Detail Kinerja QC per Shift
@@ -1321,9 +1370,93 @@ export default function App() {
             </div>
           </div>
         )}
+
+        {/* TAB 4: MASTER FORMULA & BOM EDITOR (DIKEMBALIKAN LENGKAP) */}
+        {activeTab === 'formulas' && (
+          <div className="space-y-6 animate-fadeIn">
+            <div className="p-6 rounded-2xl bg-slate-800 border border-slate-700 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Settings className="w-6 h-6 text-indigo-400" /> Master Formula & Editor BoM Custom
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Ubah rumus matematika, batas toleransi, atau tambah model produk baru secara langsung. Parameter: <code className="text-indigo-300 bg-slate-900 px-1 py-0.5 rounded">L</code> (Lebar), <code className="text-indigo-300 bg-slate-900 px-1 py-0.5 rounded">T</code> (Tinggi), <code className="text-indigo-300 bg-slate-900 px-1 py-0.5 rounded">P</code> (Panjang), <code className="text-indigo-300 bg-slate-900 px-1 py-0.5 rounded">Q</code> (Qty).
+                </p>
+              </div>
+
+              <button onClick={() => setIsAddProductModalOpen(true)} className="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all">
+                <PlusCircle className="w-4 h-4" />
+                <span>+ Buat Model Produk Baru</span>
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              {productTemplates.map((tmpl) => (
+                <div key={tmpl.id} className="p-6 rounded-2xl bg-slate-800 border border-slate-700 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-700 pb-3 gap-2">
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs font-mono font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">{tmpl.id}</span>
+                        <span className="text-xs text-slate-400">Kategori: {tmpl.category}</span>
+                      </div>
+                      <h3 className="font-bold text-white text-lg mt-0.5">{tmpl.name}</h3>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <button onClick={() => handleAddFormulaRow(tmpl.id)} className="text-xs bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white px-3 py-1.5 rounded-lg font-bold border border-emerald-500/30 flex items-center gap-1 transition-all">
+                        <Plus className="w-3.5 h-3.5" /> Tambah Komponen Bahan
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-900/80 text-slate-400 uppercase border-b border-slate-700">
+                        <tr>
+                          <th className="py-2.5 px-3">Nama Bahan</th>
+                          <th className="py-2.5 px-3">Satuan</th>
+                          <th className="py-2.5 px-3">Rumus Formula Custom (L, T, P, Q)</th>
+                          <th className="py-2.5 px-3 w-28">Toleransi (%)</th>
+                          <th className="py-2.5 px-3">Catatan Potong / Perakitan</th>
+                          <th className="py-2.5 px-3 text-right">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-700/60 font-mono">
+                        {tmpl.bomFormulas.map((f) => (
+                          <tr key={f.id} className="hover:bg-slate-750">
+                            <td className="py-2.5 px-3 font-sans">
+                              <input type="text" value={f.name} onChange={(e) => handleUpdateFormulaItem(tmpl.id, f.id, 'name', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs font-semibold focus:border-indigo-500" />
+                            </td>
+                            <td className="py-2.5 px-3 font-sans">
+                              <input type="text" value={f.unit} onChange={(e) => handleUpdateFormulaItem(tmpl.id, f.id, 'unit', e.target.value)} className="w-20 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-indigo-300 text-xs font-bold focus:border-indigo-500" />
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <input type="text" value={f.formula} onChange={(e) => handleUpdateFormulaItem(tmpl.id, f.id, 'formula', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-emerald-400 font-mono text-xs focus:border-indigo-500" />
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <input type="number" value={f.tolerancePct} onChange={(e) => handleUpdateFormulaItem(tmpl.id, f.id, 'tolerancePct', parseFloat(e.target.value) || 0)} className="w-16 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs text-center focus:border-indigo-500" />
+                            </td>
+                            <td className="py-2.5 px-3 font-sans">
+                              <input type="text" value={f.note} onChange={(e) => handleUpdateFormulaItem(tmpl.id, f.id, 'note', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-300 text-xs focus:border-indigo-500" />
+                            </td>
+                            <td className="py-2.5 px-3 text-right">
+                              <button onClick={() => handleDeleteFormulaRow(tmpl.id, f.id)} className="p-1 bg-rose-500/20 text-rose-300 hover:bg-rose-600 hover:text-white rounded transition-all" title="Hapus Baris">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </main>
 
-      {/* MODAL: TAMBAH MODEL PRODUK BARU (MODUL STEP 1) */}
+      {/* MODAL: TAMBAH MODEL PRODUK BARU */}
       {isAddProductModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn no-print">
           <div className="bg-slate-800 border border-slate-700 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
