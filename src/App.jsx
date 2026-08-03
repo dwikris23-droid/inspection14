@@ -7,22 +7,17 @@ import {
   AlertTriangle,
   CheckCircle,
   XCircle,
-  Search,
-  Plus,
   Layers,
   Ruler,
-  Trash2,
   FileText,
   BarChart3,
   Package,
   ChevronRight,
-  Eye,
   Printer,
   ShieldAlert,
   Check,
   Calculator,
   ArrowRight,
-  Settings,
   Sparkles,
   Scissors,
   Edit3,
@@ -131,7 +126,6 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('new_inspection');
   const [productTemplates, setProductTemplates] = useState(INITIAL_PRODUCT_TEMPLATES);
   const [inspections, setInspections] = useState([]);
-  const [selectedInspection, setSelectedInspection] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
   // Filter State Khusus Tab Summary
@@ -145,8 +139,6 @@ export default function App() {
     data: null,
   });
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL');
   const [inspectionStep, setInspectionStep] = useState(1);
 
   const [selectedProductTemplateId, setSelectedProductTemplateId] = useState(
@@ -459,52 +451,6 @@ export default function App() {
     }
   };
 
-  const handleUpdateFormulaItem = (tmplId, formulaId, updatedField, value) => {
-    setProductTemplates((prevTemplates) => {
-      return prevTemplates.map((tmpl) => {
-        if (tmpl.id !== tmplId) return tmpl;
-        const updatedBom = tmpl.bomFormulas.map((f) => {
-          if (f.id !== formulaId) return f;
-          return { ...f, [updatedField]: value };
-        });
-        return { ...tmpl, bomFormulas: updatedBom };
-      });
-    });
-    showToast('Rumus BoM berhasil diperbarui!');
-  };
-
-  const handleAddFormulaRow = (tmplId) => {
-    setProductTemplates((prevTemplates) => {
-      return prevTemplates.map((tmpl) => {
-        if (tmpl.id !== tmplId) return tmpl;
-        const newId = `M${tmpl.bomFormulas.length + 1}`;
-        const newRow = {
-          id: newId,
-          name: 'Komponen Baru',
-          unit: 'Pcs',
-          formula: '1',
-          tolerancePct: 2,
-          note: 'Komponen tambahan',
-        };
-        return { ...tmpl, bomFormulas: [...tmpl.bomFormulas, newRow] };
-      });
-    });
-    showToast('Komponen BoM baru ditambahkan!');
-  };
-
-  const handleDeleteFormulaRow = (tmplId, formulaId) => {
-    setProductTemplates((prevTemplates) => {
-      return prevTemplates.map((tmpl) => {
-        if (tmpl.id !== tmplId) return tmpl;
-        return {
-          ...tmpl,
-          bomFormulas: tmpl.bomFormulas.filter((f) => f.id !== formulaId),
-        };
-      });
-    });
-    showToast('Komponen BoM dihapus!');
-  };
-
   const handleCreateNewProduct = (e) => {
     e.preventDefault();
     if (!newProductForm.name || !newProductForm.id) {
@@ -536,23 +482,7 @@ export default function App() {
     });
   };
 
-  const filteredInspections = useMemo(() => {
-    return inspections.filter((item) => {
-      const searchKey = searchQuery.toLowerCase();
-      const matchesSearch =
-        (item.inspectionCustomId &&
-          item.inspectionCustomId.toLowerCase().includes(searchKey)) ||
-        (item.id && item.id.toLowerCase().includes(searchKey)) ||
-        (item.woNumber && item.woNumber.toLowerCase().includes(searchKey)) ||
-        (item.customer && item.customer.toLowerCase().includes(searchKey)) ||
-        (item.productName && item.productName.toLowerCase().includes(searchKey));
-      const matchesStatus =
-        statusFilter === 'ALL' || item.overallStatus === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
-  }, [inspections, searchQuery, statusFilter]);
-
-  // Kalkulasi & Agregasi Rekapitulasi Summary
+  // Kalkulasi Summary Metrics
   const summaryMetrics = useMemo(() => {
     const filteredForSummary = inspections.filter((record) => {
       let isDateValid = true;
@@ -633,16 +563,29 @@ export default function App() {
 
     const netWasteVariance = totalActualWaste - totalReportedWaste;
 
+    // Shift KPI Calculation
+    const defaultShifts = ['Shift 1 - Pagi', 'Shift 2 - Siang', 'Shift 3 - Malam'];
     const shiftMap = {};
+    defaultShifts.forEach(s => {
+      shiftMap[s] = { shift: s, total: 0, pass: 0, conditional: 0, reject: 0, passRate: '0.0' };
+    });
+
     filteredForSummary.forEach((r) => {
       const s = r.shift || 'Shift 1 - Pagi';
       if (!shiftMap[s]) {
-        shiftMap[s] = { shift: s, total: 0, pass: 0, conditional: 0, reject: 0 };
+        shiftMap[s] = { shift: s, total: 0, pass: 0, conditional: 0, reject: 0, passRate: '0.0' };
       }
       shiftMap[s].total += 1;
       if (r.overallStatus === 'PASS') shiftMap[s].pass += 1;
       if (r.overallStatus === 'CONDITIONAL') shiftMap[s].conditional += 1;
       if (r.overallStatus === 'REJECT') shiftMap[s].reject += 1;
+    });
+
+    Object.keys(shiftMap).forEach(key => {
+      const item = shiftMap[key];
+      if (item.total > 0) {
+        item.passRate = ((item.pass / item.total) * 100).toFixed(1);
+      }
     });
 
     return {
@@ -664,10 +607,6 @@ export default function App() {
 
   const triggerPrintSummaryReport = () => {
     setPrintPreviewModal({ isOpen: true, type: 'SUMMARY', data: summaryMetrics });
-  };
-
-  const triggerPrintSingleInspection = (inspection) => {
-    setPrintPreviewModal({ isOpen: true, type: 'SINGLE', data: inspection });
   };
 
   const executeBrowserPrint = () => {
@@ -709,7 +648,7 @@ export default function App() {
         </div>
       )}
 
-      {/* HEADER NAVBAR */}
+      {/* HEADER NAVBAR (HANYA 3 TAB UTAMA) */}
       <header className="bg-slate-800/90 backdrop-blur-md border-b border-slate-700/80 sticky top-0 z-40 no-print">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -729,9 +668,7 @@ export default function App() {
               {[
                 { id: 'new_inspection', label: '+ Inspeksi & BoM Calc', icon: Calculator },
                 { id: 'summary', label: '📊 Summary & Rekap Laporan', icon: FileText },
-                { id: 'dashboard', label: 'Dashboard & KPI', icon: BarChart3 },
-                { id: 'history', label: 'Riwayat Audit', icon: ClipboardCheck },
-                { id: 'formulas', label: 'Master Formula & BoM Editor', icon: Settings },
+                { id: 'dashboard', label: 'Dashboard & KPI Shift', icon: BarChart3 },
               ].map((tab) => {
                 const Icon = tab.icon;
                 const active = activeTab === tab.id;
@@ -1240,7 +1177,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* MODUL PERFORMA SHIFT & WASTE (LENGKAP) */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="p-6 rounded-2xl bg-slate-800 border border-slate-700 space-y-4">
                     <h3 className="font-bold text-white text-base flex items-center gap-2 border-b border-slate-700 pb-3">
@@ -1302,20 +1238,30 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 3: DASHBOARD & KPI (MODUL LENGKAP) */}
+        {/* TAB 3: DASHBOARD & KPI PER SHIFT (DIKEMBALIKAN LENGKAP) */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6 animate-fadeIn">
+            <div className="p-6 rounded-2xl bg-slate-800 border border-slate-700 shadow-xl">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <BarChart3 className="w-6 h-6 text-indigo-400" /> Dashboard Analytics & Performa KPI Shift
+              </h2>
+              <p className="text-xs text-slate-400 mt-1">
+                Matriks perbandingan hasil kualifikasi inspeksi QC berdasarkan pembagian shift operasional pabrik.
+              </p>
+            </div>
+
+            {/* RINGKASAN UTAMA OPERASIONAL */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="p-5 rounded-2xl bg-slate-800 border border-slate-700 shadow-sm">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Inspeksi</span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Inspeksi Data</span>
                 <div className="text-3xl font-extrabold text-white mt-2">{summaryMetrics?.totalInspections || 0}</div>
               </div>
               <div className="p-5 rounded-2xl bg-slate-800 border border-slate-700 shadow-sm">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Pass Rate</span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Rata-rata Pass Rate</span>
                 <div className="text-3xl font-extrabold text-emerald-400 mt-2">{summaryMetrics?.passRate || 0}%</div>
               </div>
               <div className="p-5 rounded-2xl bg-slate-800 border border-slate-700 shadow-sm">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Order Reject</span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Order Reject</span>
                 <div className="text-3xl font-extrabold text-rose-400 mt-2">{summaryMetrics?.rejectCount || 0}</div>
               </div>
               <div className="p-5 rounded-2xl bg-slate-800 border border-slate-700 shadow-sm">
@@ -1323,153 +1269,61 @@ export default function App() {
                 <div className="text-3xl font-extrabold text-amber-400 mt-2">{summaryMetrics?.wasteSummary.discrepancyCount || 0}</div>
               </div>
             </div>
-          </div>
-        )}
 
-        {/* TAB 4: RIWAYAT AUDIT */}
-        {activeTab === 'history' && (
-          <div className="space-y-6 animate-fadeIn">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-slate-800 border border-slate-700">
-              <div className="relative w-full sm:w-80">
-                <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-                <input type="text" placeholder="Cari ID, WO, Customer..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-4 py-2 text-sm text-white focus:outline-none" />
-              </div>
+            {/* KARTU BREAKDOWN KPI PER SHIFT */}
+            <div className="space-y-4">
+              <h3 className="font-bold text-white text-base flex items-center gap-2">
+                <Users className="w-5 h-5 text-indigo-400" /> Detail Kinerja QC per Shift
+              </h3>
 
-              <div className="flex items-center space-x-2">
-                <label className="text-xs text-slate-400 font-semibold">Status Filter:</label>
-                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-semibold focus:outline-none">
-                  <option value="ALL">Semua Status</option>
-                  <option value="PASS">PASS (Lulus)</option>
-                  <option value="CONDITIONAL">CONDITIONAL</option>
-                  <option value="REJECT">REJECT (Cacat)</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden shadow-xl">
-              <table className="w-full text-left text-sm text-slate-300">
-                <thead className="text-xs uppercase bg-slate-900/80 text-slate-400 border-b border-slate-700">
-                  <tr>
-                    <th className="py-3 px-4">Tanggal & ID</th>
-                    <th className="py-3 px-4">WO / Customer</th>
-                    <th className="py-3 px-4">Spesifikasi</th>
-                    <th className="py-3 px-4 text-center">Status</th>
-                    <th className="py-3 px-4 text-right">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-700/50 text-xs">
-                  {filteredInspections.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-750">
-                      <td className="py-3.5 px-4 font-mono font-bold text-indigo-300">{item.inspectionCustomId || item.id}</td>
-                      <td className="py-3.5 px-4 font-bold text-white">{item.woNumber} - {item.customer}</td>
-                      <td className="py-3.5 px-4">{item.productName}</td>
-                      <td className="py-3.5 px-4 text-center font-bold">
-                        <span className={`px-2.5 py-1 rounded-full text-[11px] ${item.overallStatus === 'PASS' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : item.overallStatus === 'REJECT' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}`}>
-                          {item.overallStatus}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-right space-x-2">
-                        <button onClick={() => triggerPrintSingleInspection(item)} className="p-1.5 bg-indigo-600/30 hover:bg-indigo-600 rounded-lg text-indigo-300 hover:text-white transition-all" title="Cetak PDF Sertifikat QC">
-                          <Printer className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => setSelectedInspection(item)} className="p-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-white transition-all" title="Lihat Detail">
-                          <Eye className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 5: MASTER FORMULA & BOM EDITOR (MODUL LENGKAP) */}
-        {activeTab === 'formulas' && (
-          <div className="space-y-6 animate-fadeIn">
-            <div className="p-6 rounded-2xl bg-slate-800 border border-slate-700 flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Settings className="w-6 h-6 text-indigo-400" /> Master Formula & Editor BoM Custom
-                </h2>
-                <p className="text-xs text-slate-400 mt-1">
-                  Ubah rumus matematika, batas toleransi, atau tambah model produk baru secara langsung. Parameter: <code className="text-indigo-300 bg-slate-900 px-1 py-0.5 rounded">L</code> (Lebar), <code className="text-indigo-300 bg-slate-900 px-1 py-0.5 rounded">T</code> (Tinggi), <code className="text-indigo-300 bg-slate-900 px-1 py-0.5 rounded">P</code> (Panjang), <code className="text-indigo-300 bg-slate-900 px-1 py-0.5 rounded">Q</code> (Qty).
-                </p>
-              </div>
-
-              <button onClick={() => setIsAddProductModalOpen(true)} className="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all">
-                <PlusCircle className="w-4 h-4" />
-                <span>+ Buat Model Produk Baru</span>
-              </button>
-            </div>
-
-            <div className="space-y-6">
-              {productTemplates.map((tmpl) => (
-                <div key={tmpl.id} className="p-6 rounded-2xl bg-slate-800 border border-slate-700 space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-700 pb-3 gap-2">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {summaryMetrics?.shiftData.map((shiftInfo, idx) => (
+                  <div key={idx} className="p-6 rounded-2xl bg-slate-800 border border-slate-700 space-y-4 shadow-lg flex flex-col justify-between">
                     <div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xs font-mono font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">{tmpl.id}</span>
-                        <span className="text-xs text-slate-400">Kategori: {tmpl.category}</span>
+                      <div className="flex items-center justify-between border-b border-slate-700 pb-3">
+                        <span className="font-bold text-white text-base">{shiftInfo.shift}</span>
+                        <span className="text-xs px-2.5 py-1 rounded-full font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                          {shiftInfo.total} Order
+                        </span>
                       </div>
-                      <h3 className="font-bold text-white text-lg mt-0.5">{tmpl.name}</h3>
+
+                      <div className="mt-4 space-y-3 text-xs">
+                        <div className="flex justify-between items-center bg-slate-900/60 p-2.5 rounded-lg border border-slate-700/60">
+                          <span className="text-slate-300 flex items-center gap-1.5 font-semibold">
+                            <CheckCircle className="w-4 h-4 text-emerald-400" /> Pass (Lulus)
+                          </span>
+                          <span className="font-bold font-mono text-emerald-400 text-sm">{shiftInfo.pass}</span>
+                        </div>
+
+                        <div className="flex justify-between items-center bg-slate-900/60 p-2.5 rounded-lg border border-slate-700/60">
+                          <span className="text-slate-300 flex items-center gap-1.5 font-semibold">
+                            <AlertTriangle className="w-4 h-4 text-amber-400" /> Conditional
+                          </span>
+                          <span className="font-bold font-mono text-amber-400 text-sm">{shiftInfo.conditional}</span>
+                        </div>
+
+                        <div className="flex justify-between items-center bg-slate-900/60 p-2.5 rounded-lg border border-slate-700/60">
+                          <span className="text-slate-300 flex items-center gap-1.5 font-semibold">
+                            <XCircle className="w-4 h-4 text-rose-400" /> Reject (Cacat)
+                          </span>
+                          <span className="font-bold font-mono text-rose-400 text-sm">{shiftInfo.reject}</span>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="flex items-center space-x-2">
-                      <button onClick={() => handleAddFormulaRow(tmpl.id)} className="text-xs bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white px-3 py-1.5 rounded-lg font-bold border border-emerald-500/30 flex items-center gap-1 transition-all">
-                        <Plus className="w-3.5 h-3.5" /> Tambah Komponen Bahan
-                      </button>
+                    <div className="pt-4 border-t border-slate-700/80 flex justify-between items-baseline">
+                      <span className="text-xs text-slate-400 font-semibold uppercase">Pass Rate Shift:</span>
+                      <span className="text-xl font-black font-mono text-indigo-300">{shiftInfo.passRate}%</span>
                     </div>
                   </div>
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-900/80 text-slate-400 uppercase border-b border-slate-700">
-                        <tr>
-                          <th className="py-2.5 px-3">Nama Bahan</th>
-                          <th className="py-2.5 px-3">Satuan</th>
-                          <th className="py-2.5 px-3">Rumus Formula Custom (L, T, P, Q)</th>
-                          <th className="py-2.5 px-3 w-28">Toleransi (%)</th>
-                          <th className="py-2.5 px-3">Catatan Potong / Perakitan</th>
-                          <th className="py-2.5 px-3 text-right">Aksi</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-700/60 font-mono">
-                        {tmpl.bomFormulas.map((f) => (
-                          <tr key={f.id} className="hover:bg-slate-750">
-                            <td className="py-2.5 px-3 font-sans">
-                              <input type="text" value={f.name} onChange={(e) => handleUpdateFormulaItem(tmpl.id, f.id, 'name', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs font-semibold focus:border-indigo-500" />
-                            </td>
-                            <td className="py-2.5 px-3 font-sans">
-                              <input type="text" value={f.unit} onChange={(e) => handleUpdateFormulaItem(tmpl.id, f.id, 'unit', e.target.value)} className="w-20 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-indigo-300 text-xs font-bold focus:border-indigo-500" />
-                            </td>
-                            <td className="py-2.5 px-3">
-                              <input type="text" value={f.formula} onChange={(e) => handleUpdateFormulaItem(tmpl.id, f.id, 'formula', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-emerald-400 font-mono text-xs focus:border-indigo-500" />
-                            </td>
-                            <td className="py-2.5 px-3">
-                              <input type="number" value={f.tolerancePct} onChange={(e) => handleUpdateFormulaItem(tmpl.id, f.id, 'tolerancePct', parseFloat(e.target.value) || 0)} className="w-16 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs text-center focus:border-indigo-500" />
-                            </td>
-                            <td className="py-2.5 px-3 font-sans">
-                              <input type="text" value={f.note} onChange={(e) => handleUpdateFormulaItem(tmpl.id, f.id, 'note', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-300 text-xs focus:border-indigo-500" />
-                            </td>
-                            <td className="py-2.5 px-3 text-right">
-                              <button onClick={() => handleDeleteFormulaRow(tmpl.id, f.id)} className="p-1 bg-rose-500/20 text-rose-300 hover:bg-rose-600 hover:text-white rounded transition-all" title="Hapus Baris">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         )}
       </main>
 
-      {/* MODAL 1: TAMBAH MODEL PRODUK BARU */}
+      {/* MODAL: TAMBAH MODEL PRODUK BARU (MODUL STEP 1) */}
       {isAddProductModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn no-print">
           <div className="bg-slate-800 border border-slate-700 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
@@ -1522,69 +1376,7 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL 2: DETAIL INSPEKSI */}
-      {selectedInspection && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn no-print">
-          <div className="bg-slate-800 border border-slate-700 rounded-2xl max-w-3xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto text-xs">
-            <div className="flex justify-between items-center border-b border-slate-700 pb-3">
-              <div>
-                <h3 className="text-base font-bold text-white font-mono">
-                  Detail Inspeksi: {selectedInspection.inspectionCustomId || selectedInspection.id}
-                </h3>
-                <p className="text-slate-400 mt-0.5">
-                  WO: {selectedInspection.woNumber} | SO: {selectedInspection.soNumber} - {selectedInspection.customer}
-                </p>
-              </div>
-              <button onClick={() => setSelectedInspection(null)} className="p-1 rounded-lg bg-slate-700 text-slate-300 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 bg-slate-900 p-3 rounded-xl border border-slate-700">
-              <div>
-                <span className="text-slate-400 block">Produk:</span>
-                <span className="font-bold text-white">{selectedInspection.productName}</span>
-              </div>
-              <div>
-                <span className="text-slate-400 block">Inspector / Shift:</span>
-                <span className="font-bold text-white">{selectedInspection.inspector} ({selectedInspection.shift})</span>
-              </div>
-            </div>
-
-            <div>
-              <h4 className="font-bold text-white mb-2 uppercase text-indigo-400">Pemeriksaan BoM:</h4>
-              <table className="w-full text-left border border-slate-700 rounded-lg overflow-hidden">
-                <thead className="bg-slate-900 text-slate-400">
-                  <tr>
-                    <th className="p-2">Material</th>
-                    <th className="p-2">Target BoM</th>
-                    <th className="p-2">Aktual</th>
-                    <th className="p-2">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-700/50">
-                  {selectedInspection.bomComparison?.map((b, i) => (
-                    <tr key={i}>
-                      <td className="p-2 text-white">{b.materialName || b.name || b.nama_bahan}</td>
-                      <td className="p-2 text-indigo-300 font-mono">{b.planned} {b.unit}</td>
-                      <td className="p-2 text-white font-mono">{b.actual} {b.unit}</td>
-                      <td className="p-2 font-bold">{b.status}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="pt-2 flex justify-end">
-              <button onClick={() => setSelectedInspection(null)} className="px-4 py-2 bg-slate-700 text-white rounded-lg font-bold hover:bg-slate-600">
-                Tutup
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 3: PRATINJAU DOKUMEN CETAK / EXPORT PDF */}
+      {/* MODAL: PRATINJAU DOKUMEN CETAK / EXPORT PDF */}
       {printPreviewModal.isOpen && (
         <div className="printable-modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
           <div className="printable-document bg-white text-slate-900 rounded-2xl max-w-4xl w-full p-8 space-y-6 shadow-2xl border border-slate-300 my-8">
@@ -1666,64 +1458,6 @@ export default function App() {
                       ))}
                     </tbody>
                   </table>
-                </div>
-              </div>
-            )}
-
-            {/* DOCUMENT: SINGLE INSPECTION */}
-            {printPreviewModal.type === 'SINGLE' && printPreviewModal.data && (
-              <div className="space-y-6">
-                <div className="flex justify-between items-center border-b pb-4">
-                  <div>
-                    <h1 className="text-xl font-bold uppercase tracking-wide text-slate-900">SERTIFIKAT HASIL INSPEKSI QC PRODUKSI</h1>
-                    <p className="text-xs text-slate-600 mt-0.5">ID Inspeksi: {printPreviewModal.data.inspectionCustomId || printPreviewModal.data.id}</p>
-                  </div>
-                  <div className="text-right font-bold text-emerald-600">
-                    {printPreviewModal.data.overallStatus}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 text-xs">
-                  <div>
-                    <p><strong>No. WO:</strong> {printPreviewModal.data.woNumber}</p>
-                    <p><strong>No. SO / Customer:</strong> {printPreviewModal.data.soNumber} / {printPreviewModal.data.customer}</p>
-                    <p><strong>Produk:</strong> {printPreviewModal.data.productName}</p>
-                  </div>
-                  <div>
-                    <p><strong>Tanggal:</strong> {printPreviewModal.data.date}</p>
-                    <p><strong>Inspector:</strong> {printPreviewModal.data.inspector}</p>
-                    <p><strong>Shift:</strong> {printPreviewModal.data.shift}</p>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="font-bold text-xs uppercase text-slate-800 mb-1">Rincian Komponen BoM</h3>
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Material</th>
-                        <th>Target</th>
-                        <th>Aktual</th>
-                        <th>Deviasi (%)</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {printPreviewModal.data.bomComparison?.map((item, idx) => (
-                        <tr key={idx}>
-                          <td>{item.materialName || item.name}</td>
-                          <td>{item.planned} {item.unit}</td>
-                          <td>{item.actual} {item.unit}</td>
-                          <td>{item.devPct}%</td>
-                          <td>{item.status}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="text-xs border-t pt-2">
-                  <p><strong>Catatan Audit:</strong> {printPreviewModal.data.statusReason}</p>
                 </div>
               </div>
             )}
