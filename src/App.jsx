@@ -129,7 +129,29 @@ const INITIAL_PRODUCT_TEMPLATES = [
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('new_inspection');
-  const [productTemplates, setProductTemplates] = useState(INITIAL_PRODUCT_TEMPLATES);
+
+  // --- SOLUSI FIX PERMANEN: INSIALISASI PRODUCT TEMPLATES DARI LOCALSTORAGE ---
+  const [productTemplates, setProductTemplates] = useState(() => {
+    try {
+      const saved = localStorage.getItem('OP_INSPECT_PRODUCT_TEMPLATES');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error('Gagal membaca localStorage:', e);
+    }
+    return INITIAL_PRODUCT_TEMPLATES;
+  });
+
+  // Simpan Otomatis ke LocalStorage setiap kali productTemplates berubah
+  useEffect(() => {
+    try {
+      localStorage.setItem('OP_INSPECT_PRODUCT_TEMPLATES', JSON.stringify(productTemplates));
+    } catch (e) {
+      console.error('Gagal menyimpan ke localStorage:', e);
+    }
+  }, [productTemplates]);
+
   const [inspections, setInspections] = useState([]);
   const [selectedInspection, setSelectedInspection] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
@@ -152,6 +174,14 @@ export default function App() {
   const [selectedProductTemplateId, setSelectedProductTemplateId] = useState(
     productTemplates[0]?.id || ''
   );
+
+  // Pastikan jika template aktif dihapus, selector berpindah otomatis ke template yang tersisa
+  useEffect(() => {
+    if (!productTemplates.find(p => p.id === selectedProductTemplateId) && productTemplates.length > 0) {
+      setSelectedProductTemplateId(productTemplates[0].id);
+    }
+  }, [productTemplates, selectedProductTemplateId]);
+
   const [woNumberInput, setWoNumberInput] = useState('WO-CUSTOM-2026-004');
   const [soNumberInput, setSoNumberInput] = useState('SO-CUST-88102');
   const [customerInput, setCustomerInput] = useState('PT Decor Minimalis Indonesia');
@@ -412,13 +442,13 @@ export default function App() {
       woNumber: woNumberInput,
       soNumber: soNumberInput,
       customer: customerInput,
-      productName: `${currentTemplate.name} (L:${dimL} T:${dimT} ${currentTemplate.unitDim})`,
+      productName: `${currentTemplate?.name || 'Produk Custom'} (L:${dimL} T:${dimT} ${currentTemplate?.unitDim || 'cm'})`,
       dimInput: {
         L: dimL,
         T: dimT,
         P: dimP,
         Q: dimQ,
-        unitDim: currentTemplate.unitDim,
+        unitDim: currentTemplate?.unitDim || 'cm',
       },
       inspector: inspectorInput,
       shift: shiftInput,
@@ -428,7 +458,7 @@ export default function App() {
       wasteAudit: {
         reportedWaste: auditEvaluation.wasteAudit.reported,
         actualMeasuredWaste: auditEvaluation.wasteAudit.actual,
-        wasteUnit: currentTemplate.id.includes('BOX') ? 'Kg' : 'm²',
+        wasteUnit: currentTemplate?.id?.includes('BOX') ? 'Kg' : 'm²',
         varianceWaste: auditEvaluation.wasteAudit.diff,
         variancePct: auditEvaluation.wasteAudit.devPct,
         status: auditEvaluation.wasteAudit.isDiscrepancy
@@ -472,7 +502,7 @@ export default function App() {
     }
   };
 
-  // FUNGSI HAPUS MASTER FORMULA / TEMPLATE PRODUK
+  // FUNGSI HAPUS MASTER FORMULA / TEMPLATE PRODUK PERMANEN
   const handleDeleteProductTemplate = (tmplId) => {
     if (productTemplates.length <= 1) {
       showToast('Minimal harus ada 1 template produk!', 'error');
@@ -481,14 +511,20 @@ export default function App() {
     if (window.confirm('Apakah Anda yakin ingin menghapus seluruh template formula produk ini?')) {
       const updated = productTemplates.filter((p) => p.id !== tmplId);
       setProductTemplates(updated);
-      if (selectedProductTemplateId === tmplId) {
-        setSelectedProductTemplateId(updated[0].id);
-      }
       showToast('Template master formula berhasil dihapus!');
     }
   };
 
-  // Fungsi Editor Komponen BoM (Ubah, Tambah, Hapus Row Formula)
+  // RESET KE DEFAULT PABRIK
+  const handleResetToDefaultTemplates = () => {
+    if (window.confirm('Kembalikan seluruh template master formula ke standar awal pabrik?')) {
+      setProductTemplates(INITIAL_PRODUCT_TEMPLATES);
+      localStorage.removeItem('OP_INSPECT_PRODUCT_TEMPLATES');
+      showToast('Master formula dikembalikan ke default!');
+    }
+  };
+
+  // Editor Komponen BoM (Ubah, Tambah, Hapus Row Formula)
   const handleUpdateFormulaItem = (tmplId, formulaId, updatedField, value) => {
     setProductTemplates((prevTemplates) => {
       return prevTemplates.map((tmpl) => {
@@ -500,7 +536,7 @@ export default function App() {
         return { ...tmpl, bomFormulas: updatedBom };
       });
     });
-    showToast('Rumus BoM berhasil diperbarui!');
+    showToast('Rumus BoM diperbarui!');
   };
 
   const handleAddFormulaRow = (tmplId) => {
@@ -545,7 +581,7 @@ export default function App() {
     setProductTemplates([...productTemplates, newProductForm]);
     setSelectedProductTemplateId(newProductForm.id);
     setIsAddProductModalOpen(false);
-    showToast(`Model produk baru "${newProductForm.name}" berhasil dibuat!`);
+    showToast(`Model produk baru "${newProductForm.name}" berhasil disimpan!`);
 
     setNewProductForm({
       id: '',
@@ -865,24 +901,24 @@ export default function App() {
                       </p>
                     </div>
                     <span className="text-xs font-mono font-bold text-indigo-300 bg-indigo-500/20 px-3 py-1 rounded-full border border-indigo-500/30">
-                      Satuan: {currentTemplate?.unitDim}
+                      Satuan: {currentTemplate?.unitDim || 'cm'}
                     </span>
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-900/80 p-4 rounded-xl border border-slate-700">
                     <div>
-                      <label className="text-xs font-bold text-indigo-300 block mb-1">Lebar (L) [{currentTemplate?.unitDim}]</label>
+                      <label className="text-xs font-bold text-indigo-300 block mb-1">Lebar (L) [{currentTemplate?.unitDim || 'cm'}]</label>
                       <input type="number" step="any" value={dimL} onChange={(e) => setDimL(e.target.value)} className="w-full bg-slate-800 border-2 border-indigo-500/60 rounded-lg px-3 py-2 font-mono text-lg text-white font-bold focus:outline-none focus:border-indigo-400" required />
                     </div>
 
                     <div>
-                      <label className="text-xs font-bold text-indigo-300 block mb-1">Tinggi (T) [{currentTemplate?.unitDim}]</label>
+                      <label className="text-xs font-bold text-indigo-300 block mb-1">Tinggi (T) [{currentTemplate?.unitDim || 'cm'}]</label>
                       <input type="number" step="any" value={dimT} onChange={(e) => setDimT(e.target.value)} className="w-full bg-slate-800 border-2 border-indigo-500/60 rounded-lg px-3 py-2 font-mono text-lg text-white font-bold focus:outline-none focus:border-indigo-400" required />
                     </div>
 
                     {(currentTemplate?.id?.includes('BOX') || dimP > 0) && (
                       <div>
-                        <label className="text-xs font-bold text-indigo-300 block mb-1">Panjang (P) [{currentTemplate?.unitDim}]</label>
+                        <label className="text-xs font-bold text-indigo-300 block mb-1">Panjang (P) [{currentTemplate?.unitDim || 'cm'}]</label>
                         <input type="number" step="any" value={dimP} onChange={(e) => setDimP(e.target.value)} className="w-full bg-slate-800 border-2 border-indigo-500/60 rounded-lg px-3 py-2 font-mono text-lg text-white font-bold focus:outline-none" />
                       </div>
                     )}
@@ -1425,7 +1461,7 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 4: RIWAYAT AUDIT (DENGAN FITUR HAPUS FIREBASE) */}
+        {/* TAB 4: RIWAYAT AUDIT */}
         {activeTab === 'history' && (
           <div className="space-y-6 animate-fadeIn">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-slate-800 border border-slate-700">
@@ -1474,7 +1510,6 @@ export default function App() {
                         <button onClick={() => setSelectedInspection(item)} className="p-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-white transition-all" title="Lihat Detail">
                           <Eye className="w-4 h-4" />
                         </button>
-                        {/* TOMBOL HAPUS RIWAYAT AUDIT */}
                         <button onClick={() => handleDeleteInspection(item.id, item.inspectionCustomId)} className="p-1.5 bg-rose-500/20 hover:bg-rose-600 rounded-lg text-rose-300 hover:text-white transition-all" title="Hapus Riwayat Audit">
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -1487,7 +1522,7 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 5: MASTER FORMULA & BOM EDITOR (DENGAN TOMBOL HAPUS TEMPLATE & ROW) */}
+        {/* TAB 5: MASTER FORMULA & BOM EDITOR */}
         {activeTab === 'formulas' && (
           <div className="space-y-6 animate-fadeIn">
             <div className="p-6 rounded-2xl bg-slate-800 border border-slate-700 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1500,10 +1535,15 @@ export default function App() {
                 </p>
               </div>
 
-              <button onClick={() => setIsAddProductModalOpen(true)} className="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all">
-                <PlusCircle className="w-4 h-4" />
-                <span>+ Buat Model Produk Baru</span>
-              </button>
+              <div className="flex items-center space-x-2">
+                <button onClick={handleResetToDefaultTemplates} className="px-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold text-xs flex items-center gap-1 transition-all">
+                  <RotateCcw className="w-3.5 h-3.5" /> Reset Default
+                </button>
+                <button onClick={() => setIsAddProductModalOpen(true)} className="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all">
+                  <PlusCircle className="w-4 h-4" />
+                  <span>+ Buat Model Produk Baru</span>
+                </button>
+              </div>
             </div>
 
             <div className="space-y-6">
@@ -1522,7 +1562,6 @@ export default function App() {
                       <button onClick={() => handleAddFormulaRow(tmpl.id)} className="text-xs bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white px-3 py-1.5 rounded-lg font-bold border border-emerald-500/30 flex items-center gap-1 transition-all">
                         <Plus className="w-3.5 h-3.5" /> Tambah Bahan
                       </button>
-                      {/* TOMBOL HAPUS MASTER FORMULA / TEMPLATE PRODUK */}
                       <button onClick={() => handleDeleteProductTemplate(tmpl.id)} className="text-xs bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white px-3 py-1.5 rounded-lg font-bold border border-rose-500/30 flex items-center gap-1 transition-all" title="Hapus Seluruh Master Formula Ini">
                         <Trash2 className="w-3.5 h-3.5" /> Hapus Template
                       </button>
