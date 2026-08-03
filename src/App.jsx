@@ -1,7 +1,7 @@
 // src/App.js
 import React, { useState, useMemo, useEffect } from 'react';
 import { db } from './firebase'; 
-import { collection, onSnapshot, addDoc, deleteDoc, doc } from 'firebase/firestore'; 
+import { collection, onSnapshot, addDoc, deleteDoc, doc, setDoc, updateDoc } from 'firebase/firestore'; 
 import {
   ClipboardCheck,
   AlertTriangle,
@@ -32,10 +32,10 @@ import {
   Activity,
   Filter,
   RotateCcw,
-  Download, // Icon Tambahan untuk CSV
+  Download,
 } from 'lucide-react';
 
-// Evaluator Formula Dinamis (Mendukung L, T, P, Q dan Operator Matematika JS)
+// Evaluator Formula Dinamis
 const evaluateFormula = (formulaStr, params) => {
   try {
     const { L = 0, T = 0, P = 0, Q = 1 } = params;
@@ -105,51 +105,11 @@ const INITIAL_PRODUCT_TEMPLATES = [
     ],
     estWasteStandardPct: 3.5,
   },
-  {
-    id: 'PROD-BOX01',
-    name: 'Custom Box Karton Flute (P x L x T)',
-    category: 'Packaging',
-    defaultL: 30,
-    defaultT: 20,
-    defaultP: 15,
-    defaultQ: 100,
-    unitDim: 'cm',
-    bomFormulas: [
-      { id: 'M1', name: 'Lembaran Karton Corrugated B-Flute', unit: 'm²', formula: '(((2*L + 2*T + 5)*(P + T + 3))/10000) * Q', tolerancePct: 4, note: 'Luas bentangan sheet karton' },
-      { id: 'M2', name: 'Lem Industri Cold Glue', unit: 'Kg', formula: '0.005 * Q', tolerancePct: 5, note: 'Lem sambungan kuping' },
-      { id: 'M3', name: 'Tinta Cetak Waterbased', unit: 'Kg', formula: '0.002 * Q', tolerancePct: 5, note: 'Sablon logo & keterangan' },
-    ],
-    soDimensionSpecs: [
-      { id: 'S1', name: 'Panjang Luar Box', targetFormula: 'L', minTol: -0.2, maxTol: 0.2, unit: 'cm' },
-      { id: 'S2', name: 'Lebar Luar Box', targetFormula: 'T', minTol: -0.2, maxTol: 0.2, unit: 'cm' },
-      { id: 'S3', name: 'Tinggi Luar Box', targetFormula: 'P', minTol: -0.2, maxTol: 0.2, unit: 'cm' },
-    ],
-    estWasteStandardPct: 4.0,
-  },
 ];
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('new_inspection');
-
-  // Insialisasi LocalStorage
-  const [productTemplates, setProductTemplates] = useState(() => {
-    try {
-      const saved = localStorage.getItem('OP_INSPECT_PRODUCT_TEMPLATES');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.error('Gagal membaca localStorage:', e);
-    }
-    return INITIAL_PRODUCT_TEMPLATES;
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('OP_INSPECT_PRODUCT_TEMPLATES', JSON.stringify(productTemplates));
-    } catch (e) {
-      console.error('Gagal menyimpan ke localStorage:', e);
-    }
-  }, [productTemplates]);
-
+  const [productTemplates, setProductTemplates] = useState([]);
   const [inspections, setInspections] = useState([]);
   const [selectedInspection, setSelectedInspection] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
@@ -169,15 +129,7 @@ export default function App() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [inspectionStep, setInspectionStep] = useState(1);
 
-  const [selectedProductTemplateId, setSelectedProductTemplateId] = useState(
-    productTemplates[0]?.id || ''
-  );
-
-  useEffect(() => {
-    if (!productTemplates.find(p => p.id === selectedProductTemplateId) && productTemplates.length > 0) {
-      setSelectedProductTemplateId(productTemplates[0].id);
-    }
-  }, [productTemplates, selectedProductTemplateId]);
+  const [selectedProductTemplateId, setSelectedProductTemplateId] = useState('');
 
   const [woNumberInput, setWoNumberInput] = useState('WO-CUSTOM-2026-004');
   const [soNumberInput, setSoNumberInput] = useState('SO-CUST-88102');
@@ -220,20 +172,49 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Realtime Firebase Listener
+  // 1. FIREBASE REALTIME LISTENER: MASTER FORMULA (product_templates)
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(db, 'product_templates'),
+      (snapshot) => {
+        const fetchedTemplates = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+        }));
+
+        if (fetchedTemplates.length === 0) {
+          // Jika di Firebase masih kosong, upload template default awal
+          INITIAL_PRODUCT_TEMPLATES.forEach(async (tmpl) => {
+            await setDoc(doc(db, 'product_templates', tmpl.id), tmpl);
+          });
+        } else {
+          setProductTemplates(fetchedTemplates);
+          if (!selectedProductTemplateId) {
+            setSelectedProductTemplateId(fetchedTemplates[0].id);
+          }
+        }
+      },
+      (error) => {
+        console.error('Firebase Templates Error:', error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  // 2. FIREBASE REALTIME LISTENER: HASIL INSPEKSI (inspections)
   useEffect(() => {
     const unsubscribe = onSnapshot(
       collection(db, 'inspections'),
       (snapshot) => {
-        const fetchedInspections = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
+        const fetchedInspections = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
         }));
         setInspections(fetchedInspections);
       },
       (error) => {
-        console.error('Firebase connection error:', error);
-        showToast('Gagal terhubung ke Firebase', 'error');
+        console.error('Firebase Inspections Error:', error);
       }
     );
 
@@ -257,7 +238,7 @@ export default function App() {
   }, [selectedProductTemplateId, currentTemplate]);
 
   const calculatedTargetBom = useMemo(() => {
-    if (!currentTemplate) return [];
+    if (!currentTemplate || !currentTemplate.bomFormulas) return [];
     const params = {
       L: parseFloat(dimL) || 0,
       T: parseFloat(dimT) || 0,
@@ -279,7 +260,7 @@ export default function App() {
   }, [currentTemplate, dimL, dimT, dimP, dimQ]);
 
   const calculatedTargetSpecs = useMemo(() => {
-    if (!currentTemplate) return [];
+    if (!currentTemplate || !currentTemplate.soDimensionSpecs) return [];
     const params = {
       L: parseFloat(dimL) || 0,
       T: parseFloat(dimT) || 0,
@@ -425,6 +406,7 @@ export default function App() {
     actualDimensionsMeasured,
   ]);
 
+  // SIMPAN HASIL INSPEKSI KE FIREBASE
   const handleSubmitInspection = async (e) => {
     e.preventDefault();
     if (!auditEvaluation) return;
@@ -472,12 +454,7 @@ export default function App() {
 
     try {
       await addDoc(collection(db, 'inspections'), newInspectionRecord);
-
-      showToast(
-        `Inspeksi ${newInspectionRecord.inspectionCustomId} berhasil disimpan ke Firebase! Status: ${newInspectionRecord.overallStatus}`,
-        newInspectionRecord.overallStatus === 'PASS' ? 'success' : 'error'
-      );
-
+      showToast(`Inspeksi ${newInspectionRecord.inspectionCustomId} tersimpan ke Firebase!`);
       setInspectionStep(1);
       setActiveTab('summary');
     } catch (err) {
@@ -486,113 +463,130 @@ export default function App() {
     }
   };
 
+  // HAPUS RIWAYAT AUDIT DARI FIREBASE
   const handleDeleteInspection = async (docId, customId) => {
-    if (window.confirm(`Apakah Anda yakin ingin menghapus data inspeksi ${customId || docId}?`)) {
+    if (window.confirm(`Hapus data inspeksi ${customId || docId}?`)) {
       try {
         await deleteDoc(doc(db, 'inspections', docId));
-        showToast(`Data inspeksi ${customId || docId} berhasil dihapus dari Firebase!`);
+        showToast(`Inspeksi ${customId || docId} berhasil dihapus dari Firebase!`);
       } catch (err) {
-        console.error('Gagal menghapus data dari Firebase:', err);
         showToast('Gagal menghapus data dari Firebase!', 'error');
       }
     }
   };
 
-  const handleDeleteProductTemplate = (tmplId) => {
-    if (productTemplates.length <= 1) {
-      showToast('Minimal harus ada 1 template produk!', 'error');
-      return;
-    }
-    if (window.confirm('Apakah Anda yakin ingin menghapus seluruh template formula produk ini?')) {
-      const updated = productTemplates.filter((p) => p.id !== tmplId);
-      setProductTemplates(updated);
-      showToast('Template master formula berhasil dihapus!');
-    }
-  };
-
-  const handleResetToDefaultTemplates = () => {
-    if (window.confirm('Kembalikan seluruh template master formula ke standar awal pabrik?')) {
-      setProductTemplates(INITIAL_PRODUCT_TEMPLATES);
-      localStorage.removeItem('OP_INSPECT_PRODUCT_TEMPLATES');
-      showToast('Master formula dikembalikan ke default!');
-    }
-  };
-
-  const handleUpdateFormulaItem = (tmplId, formulaId, updatedField, value) => {
-    setProductTemplates((prevTemplates) => {
-      return prevTemplates.map((tmpl) => {
-        if (tmpl.id !== tmplId) return tmpl;
-        const updatedBom = tmpl.bomFormulas.map((f) => {
-          if (f.id !== formulaId) return f;
-          return { ...f, [updatedField]: value };
-        });
-        return { ...tmpl, bomFormulas: updatedBom };
-      });
-    });
-    showToast('Rumus BoM diperbarui!');
-  };
-
-  const handleAddFormulaRow = (tmplId) => {
-    setProductTemplates((prevTemplates) => {
-      return prevTemplates.map((tmpl) => {
-        if (tmpl.id !== tmplId) return tmpl;
-        const newId = `M${tmpl.bomFormulas.length + 1}`;
-        const newRow = {
-          id: newId,
-          name: 'Komponen Baru',
-          unit: 'Pcs',
-          formula: '1',
-          tolerancePct: 2,
-          note: 'Komponen tambahan',
-        };
-        return { ...tmpl, bomFormulas: [...tmpl.bomFormulas, newRow] };
-      });
-    });
-    showToast('Komponen BoM baru ditambahkan!');
-  };
-
-  const handleDeleteFormulaRow = (tmplId, formulaId) => {
-    setProductTemplates((prevTemplates) => {
-      return prevTemplates.map((tmpl) => {
-        if (tmpl.id !== tmplId) return tmpl;
-        return {
-          ...tmpl,
-          bomFormulas: tmpl.bomFormulas.filter((f) => f.id !== formulaId),
-        };
-      });
-    });
-    showToast('Komponen BoM dihapus!');
-  };
-
-  const handleCreateNewProduct = (e) => {
+  // TAMBAH MASTER TEMPLATE PRODUK BARU KE FIREBASE
+  const handleCreateNewProduct = async (e) => {
     e.preventDefault();
     if (!newProductForm.name || !newProductForm.id) {
       showToast('Harap isi ID dan Nama Produk!', 'error');
       return;
     }
 
-    setProductTemplates([...productTemplates, newProductForm]);
-    setSelectedProductTemplateId(newProductForm.id);
-    setIsAddProductModalOpen(false);
-    showToast(`Model produk baru "${newProductForm.name}" berhasil disimpan!`);
+    try {
+      await setDoc(doc(db, 'product_templates', newProductForm.id), newProductForm);
+      setSelectedProductTemplateId(newProductForm.id);
+      setIsAddProductModalOpen(false);
+      showToast(`Model produk "${newProductForm.name}" disimpan ke Firebase!`);
 
-    setNewProductForm({
-      id: '',
-      name: '',
-      category: 'Window Blinds',
-      unitDim: 'cm',
-      defaultL: 100,
-      defaultT: 150,
-      defaultP: 0,
-      defaultQ: 1,
-      bomFormulas: [
-        { id: 'M1', name: 'Bahan Utama', unit: 'm²', formula: '((L-2)*(T+10))/10000', tolerancePct: 3, note: 'Formula bahan utama' },
-      ],
-      soDimensionSpecs: [
-        { id: 'S1', name: 'Lebar Akhir (L)', targetFormula: 'L', minTol: -0.2, maxTol: 0.2, unit: 'cm' },
-      ],
-      estWasteStandardPct: 3.0,
+      setNewProductForm({
+        id: '',
+        name: '',
+        category: 'Window Blinds',
+        unitDim: 'cm',
+        defaultL: 100,
+        defaultT: 150,
+        defaultP: 0,
+        defaultQ: 1,
+        bomFormulas: [
+          { id: 'M1', name: 'Bahan Utama', unit: 'm²', formula: '((L-2)*(T+10))/10000', tolerancePct: 3, note: 'Formula bahan utama' },
+        ],
+        soDimensionSpecs: [
+          { id: 'S1', name: 'Lebar Akhir (L)', targetFormula: 'L', minTol: -0.2, maxTol: 0.2, unit: 'cm' },
+        ],
+        estWasteStandardPct: 3.0,
+      });
+    } catch (err) {
+      console.error(err);
+      showToast('Gagal menyimpan template baru ke Firebase!', 'error');
+    }
+  };
+
+  // HAPUS TEMPLATE PRODUK DARI FIREBASE
+  const handleDeleteProductTemplate = async (tmplId) => {
+    if (productTemplates.length <= 1) {
+      showToast('Minimal harus ada 1 template produk!', 'error');
+      return;
+    }
+    if (window.confirm('Hapus seluruh template formula produk ini dari Firebase?')) {
+      try {
+        await deleteDoc(doc(db, 'product_templates', tmplId));
+        showToast('Master formula dihapus dari Firebase!');
+      } catch (err) {
+        showToast('Gagal menghapus dari Firebase!', 'error');
+      }
+    }
+  };
+
+  // EDIT BARIS FORMULA BOMI LANGSUNG DI FIREBASE
+  const handleUpdateFormulaItem = async (tmplId, formulaId, updatedField, value) => {
+    const tmpl = productTemplates.find((p) => p.id === tmplId);
+    if (!tmpl) return;
+
+    const updatedBom = tmpl.bomFormulas.map((f) => {
+      if (f.id !== formulaId) return f;
+      return { ...f, [updatedField]: value };
     });
+
+    try {
+      await updateDoc(doc(db, 'product_templates', tmplId), {
+        bomFormulas: updatedBom,
+      });
+      showToast('Rumus diperbarui di Firebase!');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // TAMBAH BARIS KOMPONEN BARU KE FIREBASE
+  const handleAddFormulaRow = async (tmplId) => {
+    const tmpl = productTemplates.find((p) => p.id === tmplId);
+    if (!tmpl) return;
+
+    const newRow = {
+      id: `M${tmpl.bomFormulas.length + 1}`,
+      name: 'Komponen Baru',
+      unit: 'Pcs',
+      formula: '1',
+      tolerancePct: 2,
+      note: 'Komponen tambahan',
+    };
+
+    try {
+      await updateDoc(doc(db, 'product_templates', tmplId), {
+        bomFormulas: [...tmpl.bomFormulas, newRow],
+      });
+      showToast('Bahan baru disimpan ke Firebase!');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // HAPUS BARIS KOMPONEN DARI FIREBASE
+  const handleDeleteFormulaRow = async (tmplId, formulaId) => {
+    const tmpl = productTemplates.find((p) => p.id === tmplId);
+    if (!tmpl) return;
+
+    const updatedBom = tmpl.bomFormulas.filter((f) => f.id !== formulaId);
+
+    try {
+      await updateDoc(doc(db, 'product_templates', tmplId), {
+        bomFormulas: updatedBom,
+      });
+      showToast('Baris bahan dihapus dari Firebase!');
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const filteredInspections = useMemo(() => {
@@ -611,7 +605,6 @@ export default function App() {
     });
   }, [inspections, searchQuery, statusFilter]);
 
-  // Kalkulasi Summary Metrics
   const summaryMetrics = useMemo(() => {
     const filteredForSummary = inspections.filter((record) => {
       let isDateValid = true;
@@ -733,7 +726,6 @@ export default function App() {
     };
   }, [inspections, summaryStartDate, summaryEndDate, summaryProductFilter]);
 
-  // --- FUNGSI EKSPOR REKAP DATA KE CSV ---
   const exportSummaryToCSV = () => {
     if (!summaryMetrics || !summaryMetrics.aggregatedMaterials.length) {
       showToast('Tidak ada data summary untuk di-export!', 'error');
@@ -741,14 +733,11 @@ export default function App() {
     }
 
     let csvContent = "data:text/csv;charset=utf-8,";
-    
-    // Header Laporan
     csvContent += "REKAPITULASI LAPORAN AUDIT QC & KONSUMSI BOM\n";
     csvContent += `Tanggal Ekspor,${new Date().toISOString().substring(0, 10)}\n`;
     csvContent += `Total Inspeksi Order,${summaryMetrics.totalInspections}\n`;
     csvContent += `Pass Rate,${summaryMetrics.passRate}%\n\n`;
 
-    // Tabel Rekapitulasi Bahan Baku
     csvContent += "NAMA BAHAN / KOMPONEN,SATUAN,TARGET PLAN BOM,TOTAL AKTUAL,SELISIH (VARIANCE),DEVIASI (%),STATUS PEMAKAIAN\n";
 
     summaryMetrics.aggregatedMaterials.forEach((mat) => {
@@ -758,13 +747,11 @@ export default function App() {
     });
 
     csvContent += "\n";
-    // Tabel Performa Shift
     csvContent += "SHIFT KERJA,TOTAL INSPEKSI,PASS,CONDITIONAL,REJECT,PASS RATE (%)\n";
     summaryMetrics.shiftData.forEach((s) => {
       csvContent += `"${s.shift}",${s.total},${s.pass},${s.conditional},${s.reject},${s.passRate}%\n`;
     });
 
-    // Download File Trigger
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -833,7 +820,7 @@ export default function App() {
               </div>
               <div>
                 <h1 className="font-bold text-lg text-white tracking-wide flex items-center gap-2">
-                  OP-INSPECT <span className="text-xs px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-400 font-mono border border-indigo-500/30">Custom BoM v3.5</span>
+                  OP-INSPECT <span className="text-xs px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-400 font-mono border border-indigo-500/30">Firebase Sync v3.6</span>
                 </h1>
                 <p className="text-xs text-slate-400">Custom Product BoM Calculator & Field QC Inspection</p>
               </div>
@@ -1220,7 +1207,6 @@ export default function App() {
                 </p>
               </div>
 
-              {/* TOMBOL PRINT DAN DOWNLOAD CSV */}
               <div className="flex items-center space-x-2">
                 <button onClick={exportSummaryToCSV} className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 flex items-center space-x-2 transition-all">
                   <Download className="w-4 h-4" />
@@ -1577,9 +1563,6 @@ export default function App() {
               </div>
 
               <div className="flex items-center space-x-2">
-                <button onClick={handleResetToDefaultTemplates} className="px-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold text-xs flex items-center gap-1 transition-all">
-                  <RotateCcw className="w-3.5 h-3.5" /> Reset Default
-                </button>
                 <button onClick={() => setIsAddProductModalOpen(true)} className="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all">
                   <PlusCircle className="w-4 h-4" />
                   <span>+ Buat Model Produk Baru</span>
@@ -1622,7 +1605,7 @@ export default function App() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-700/60 font-mono">
-                        {tmpl.bomFormulas.map((f) => (
+                        {tmpl.bomFormulas?.map((f) => (
                           <tr key={f.id} className="hover:bg-slate-750">
                             <td className="py-2.5 px-3 font-sans">
                               <input type="text" value={f.name} onChange={(e) => handleUpdateFormulaItem(tmpl.id, f.id, 'name', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs font-semibold focus:border-indigo-500" />
