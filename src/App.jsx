@@ -1,7 +1,7 @@
 // src/App.js
 import React, { useState, useMemo, useEffect } from 'react';
 import { db } from './firebase'; 
-import { collection, onSnapshot, addDoc } from 'firebase/firestore'; 
+import { collection, onSnapshot, addDoc, deleteDoc, doc } from 'firebase/firestore'; 
 import {
   ClipboardCheck,
   AlertTriangle,
@@ -459,7 +459,36 @@ export default function App() {
     }
   };
 
-  // Fungsi Master Formula Editor (Ubah, Tambah, Hapus Formula)
+  // FUNGSI HAPUS RIWAYAT AUDIT DARI FIREBASE
+  const handleDeleteInspection = async (docId, customId) => {
+    if (window.confirm(`Apakah Anda yakin ingin menghapus data inspeksi ${customId || docId}?`)) {
+      try {
+        await deleteDoc(doc(db, 'inspections', docId));
+        showToast(`Data inspeksi ${customId || docId} berhasil dihapus dari Firebase!`);
+      } catch (err) {
+        console.error('Gagal menghapus data dari Firebase:', err);
+        showToast('Gagal menghapus data dari Firebase!', 'error');
+      }
+    }
+  };
+
+  // FUNGSI HAPUS MASTER FORMULA / TEMPLATE PRODUK
+  const handleDeleteProductTemplate = (tmplId) => {
+    if (productTemplates.length <= 1) {
+      showToast('Minimal harus ada 1 template produk!', 'error');
+      return;
+    }
+    if (window.confirm('Apakah Anda yakin ingin menghapus seluruh template formula produk ini?')) {
+      const updated = productTemplates.filter((p) => p.id !== tmplId);
+      setProductTemplates(updated);
+      if (selectedProductTemplateId === tmplId) {
+        setSelectedProductTemplateId(updated[0].id);
+      }
+      showToast('Template master formula berhasil dihapus!');
+    }
+  };
+
+  // Fungsi Editor Komponen BoM (Ubah, Tambah, Hapus Row Formula)
   const handleUpdateFormulaItem = (tmplId, formulaId, updatedField, value) => {
     setProductTemplates((prevTemplates) => {
       return prevTemplates.map((tmpl) => {
@@ -722,7 +751,7 @@ export default function App() {
         </div>
       )}
 
-      {/* HEADER NAVBAR (SEMUA 5 TAB LENGKAP) */}
+      {/* HEADER NAVBAR */}
       <header className="bg-slate-800/90 backdrop-blur-md border-b border-slate-700/80 sticky top-0 z-40 no-print">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -1396,7 +1425,7 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 4: RIWAYAT AUDIT (DIKEMBALIKAN) */}
+        {/* TAB 4: RIWAYAT AUDIT (DENGAN FITUR HAPUS FIREBASE) */}
         {activeTab === 'history' && (
           <div className="space-y-6 animate-fadeIn">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-slate-800 border border-slate-700">
@@ -1445,6 +1474,10 @@ export default function App() {
                         <button onClick={() => setSelectedInspection(item)} className="p-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-white transition-all" title="Lihat Detail">
                           <Eye className="w-4 h-4" />
                         </button>
+                        {/* TOMBOL HAPUS RIWAYAT AUDIT */}
+                        <button onClick={() => handleDeleteInspection(item.id, item.inspectionCustomId)} className="p-1.5 bg-rose-500/20 hover:bg-rose-600 rounded-lg text-rose-300 hover:text-white transition-all" title="Hapus Riwayat Audit">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -1454,7 +1487,7 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 5: MASTER FORMULA & BOM EDITOR (DIKEMBALIKAN DENGAN FITUR TRASH & TAMBAH) */}
+        {/* TAB 5: MASTER FORMULA & BOM EDITOR (DENGAN TOMBOL HAPUS TEMPLATE & ROW) */}
         {activeTab === 'formulas' && (
           <div className="space-y-6 animate-fadeIn">
             <div className="p-6 rounded-2xl bg-slate-800 border border-slate-700 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1487,7 +1520,11 @@ export default function App() {
 
                     <div className="flex items-center space-x-2">
                       <button onClick={() => handleAddFormulaRow(tmpl.id)} className="text-xs bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white px-3 py-1.5 rounded-lg font-bold border border-emerald-500/30 flex items-center gap-1 transition-all">
-                        <Plus className="w-3.5 h-3.5" /> Tambah Komponen Bahan
+                        <Plus className="w-3.5 h-3.5" /> Tambah Bahan
+                      </button>
+                      {/* TOMBOL HAPUS MASTER FORMULA / TEMPLATE PRODUK */}
+                      <button onClick={() => handleDeleteProductTemplate(tmpl.id)} className="text-xs bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white px-3 py-1.5 rounded-lg font-bold border border-rose-500/30 flex items-center gap-1 transition-all" title="Hapus Seluruh Master Formula Ini">
+                        <Trash2 className="w-3.5 h-3.5" /> Hapus Template
                       </button>
                     </div>
                   </div>
@@ -1523,7 +1560,7 @@ export default function App() {
                               <input type="text" value={f.note} onChange={(e) => handleUpdateFormulaItem(tmpl.id, f.id, 'note', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-300 text-xs focus:border-indigo-500" />
                             </td>
                             <td className="py-2.5 px-3 text-right">
-                              <button onClick={() => handleDeleteFormulaRow(tmpl.id, f.id)} className="p-1 bg-rose-500/20 text-rose-300 hover:bg-rose-600 hover:text-white rounded transition-all" title="Hapus Baris">
+                              <button onClick={() => handleDeleteFormulaRow(tmpl.id, f.id)} className="p-1 bg-rose-500/20 text-rose-300 hover:bg-rose-600 hover:text-white rounded transition-all" title="Hapus Baris Komponen">
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </td>
@@ -1592,7 +1629,7 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL: DETAIL INSPEKSI (DIKEMBALIKAN) */}
+      {/* MODAL: DETAIL INSPEKSI */}
       {selectedInspection && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn no-print">
           <div className="bg-slate-800 border border-slate-700 rounded-2xl max-w-3xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto text-xs">
