@@ -32,6 +32,7 @@ import {
   Activity,
   Filter,
   RotateCcw,
+  Download, // Icon Tambahan untuk CSV
 } from 'lucide-react';
 
 // Evaluator Formula Dinamis (Mendukung L, T, P, Q dan Operator Matematika JS)
@@ -71,7 +72,7 @@ const INITIAL_PRODUCT_TEMPLATES = [
       { id: 'M3', name: 'Headrail Profile Top', unit: 'cm', formula: 'L - 3', tolerancePct: 2, note: 'Rel pembungkus atas' },
       { id: 'M4', name: 'Bottom Rail Heavy Duty', unit: 'cm', formula: 'L - 3', tolerancePct: 2, note: 'Pemberat bagian bawah' },
       { id: 'M5', name: 'Roller Mechanism Set', unit: 'Set', formula: '1', tolerancePct: 0, note: 'Mekanisme rantai dan spring' },
-      { id: 'M6', name: 'Bracket Mounting', unit: 'Pcs', formula: 'L > 150 ? 3 : 2', tolerancePct: 0, note: '2 pcs jika L<=150cm, 3 pcs jika >150cm' },
+      { id: 'M6', name: 'Bracket Mounting', unit: 'Pcs', formula: 'L > 180 ? 4 : (L >= 120 ? 3 : 2)', tolerancePct: 0, note: 'Ternary 3 kondisi L' },
       { id: 'M7', name: 'Chain Tarikan Nylon', unit: 'cm', formula: '(T * 2) - 20', tolerancePct: 5, note: 'Panjang keliling rantai' },
     ],
     soDimensionSpecs: [
@@ -130,20 +131,17 @@ const INITIAL_PRODUCT_TEMPLATES = [
 export default function App() {
   const [activeTab, setActiveTab] = useState('new_inspection');
 
-  // --- SOLUSI FIX PERMANEN: INSIALISASI PRODUCT TEMPLATES DARI LOCALSTORAGE ---
+  // Insialisasi LocalStorage
   const [productTemplates, setProductTemplates] = useState(() => {
     try {
       const saved = localStorage.getItem('OP_INSPECT_PRODUCT_TEMPLATES');
-      if (saved) {
-        return JSON.parse(saved);
-      }
+      if (saved) return JSON.parse(saved);
     } catch (e) {
       console.error('Gagal membaca localStorage:', e);
     }
     return INITIAL_PRODUCT_TEMPLATES;
   });
 
-  // Simpan Otomatis ke LocalStorage setiap kali productTemplates berubah
   useEffect(() => {
     try {
       localStorage.setItem('OP_INSPECT_PRODUCT_TEMPLATES', JSON.stringify(productTemplates));
@@ -156,7 +154,7 @@ export default function App() {
   const [selectedInspection, setSelectedInspection] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
-  // Filter State Khusus Tab Summary
+  // Filter State Tab Summary
   const [summaryStartDate, setSummaryStartDate] = useState('');
   const [summaryEndDate, setSummaryEndDate] = useState('');
   const [summaryProductFilter, setSummaryProductFilter] = useState('ALL');
@@ -175,7 +173,6 @@ export default function App() {
     productTemplates[0]?.id || ''
   );
 
-  // Pastikan jika template aktif dihapus, selector berpindah otomatis ke template yang tersisa
   useEffect(() => {
     if (!productTemplates.find(p => p.id === selectedProductTemplateId) && productTemplates.length > 0) {
       setSelectedProductTemplateId(productTemplates[0].id);
@@ -489,7 +486,6 @@ export default function App() {
     }
   };
 
-  // FUNGSI HAPUS RIWAYAT AUDIT DARI FIREBASE
   const handleDeleteInspection = async (docId, customId) => {
     if (window.confirm(`Apakah Anda yakin ingin menghapus data inspeksi ${customId || docId}?`)) {
       try {
@@ -502,7 +498,6 @@ export default function App() {
     }
   };
 
-  // FUNGSI HAPUS MASTER FORMULA / TEMPLATE PRODUK PERMANEN
   const handleDeleteProductTemplate = (tmplId) => {
     if (productTemplates.length <= 1) {
       showToast('Minimal harus ada 1 template produk!', 'error');
@@ -515,7 +510,6 @@ export default function App() {
     }
   };
 
-  // RESET KE DEFAULT PABRIK
   const handleResetToDefaultTemplates = () => {
     if (window.confirm('Kembalikan seluruh template master formula ke standar awal pabrik?')) {
       setProductTemplates(INITIAL_PRODUCT_TEMPLATES);
@@ -524,7 +518,6 @@ export default function App() {
     }
   };
 
-  // Editor Komponen BoM (Ubah, Tambah, Hapus Row Formula)
   const handleUpdateFormulaItem = (tmplId, formulaId, updatedField, value) => {
     setProductTemplates((prevTemplates) => {
       return prevTemplates.map((tmpl) => {
@@ -739,6 +732,49 @@ export default function App() {
       shiftData: Object.values(shiftMap),
     };
   }, [inspections, summaryStartDate, summaryEndDate, summaryProductFilter]);
+
+  // --- FUNGSI EKSPOR REKAP DATA KE CSV ---
+  const exportSummaryToCSV = () => {
+    if (!summaryMetrics || !summaryMetrics.aggregatedMaterials.length) {
+      showToast('Tidak ada data summary untuk di-export!', 'error');
+      return;
+    }
+
+    let csvContent = "data:text/csv;charset=utf-8,";
+    
+    // Header Laporan
+    csvContent += "REKAPITULASI LAPORAN AUDIT QC & KONSUMSI BOM\n";
+    csvContent += `Tanggal Ekspor,${new Date().toISOString().substring(0, 10)}\n`;
+    csvContent += `Total Inspeksi Order,${summaryMetrics.totalInspections}\n`;
+    csvContent += `Pass Rate,${summaryMetrics.passRate}%\n\n`;
+
+    // Tabel Rekapitulasi Bahan Baku
+    csvContent += "NAMA BAHAN / KOMPONEN,SATUAN,TARGET PLAN BOM,TOTAL AKTUAL,SELISIH (VARIANCE),DEVIASI (%),STATUS PEMAKAIAN\n";
+
+    summaryMetrics.aggregatedMaterials.forEach((mat) => {
+      const statusText = mat.exceededCount > 0 ? `Over-budget ${mat.exceededCount}x` : 'Efisien / In-Budget';
+      const row = `"${mat.name}",${mat.unit},${mat.totalPlannedFormatted},${mat.totalActualFormatted},${mat.diffFormatted},${mat.devPctFormatted}%,${statusText}`;
+      csvContent += row + "\n";
+    });
+
+    csvContent += "\n";
+    // Tabel Performa Shift
+    csvContent += "SHIFT KERJA,TOTAL INSPEKSI,PASS,CONDITIONAL,REJECT,PASS RATE (%)\n";
+    summaryMetrics.shiftData.forEach((s) => {
+      csvContent += `"${s.shift}",${s.total},${s.pass},${s.conditional},${s.reject},${s.passRate}%\n`;
+    });
+
+    // Download File Trigger
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Rekap_BOM_QC_${new Date().toISOString().substring(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    showToast("File CSV berhasil diunduh!");
+  };
 
   const triggerPrintSummaryReport = () => {
     setPrintPreviewModal({ isOpen: true, type: 'SUMMARY', data: summaryMetrics });
@@ -1184,10 +1220,15 @@ export default function App() {
                 </p>
               </div>
 
-              <div className="flex items-center space-x-3">
+              {/* TOMBOL PRINT DAN DOWNLOAD CSV */}
+              <div className="flex items-center space-x-2">
+                <button onClick={exportSummaryToCSV} className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 flex items-center space-x-2 transition-all">
+                  <Download className="w-4 h-4" />
+                  <span>Download CSV</span>
+                </button>
                 <button onClick={triggerPrintSummaryReport} className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 flex items-center space-x-2 transition-all">
                   <Printer className="w-4 h-4" />
-                  <span>Cetak / Export PDF Summary</span>
+                  <span>Cetak / Export PDF</span>
                 </button>
               </div>
             </div>
