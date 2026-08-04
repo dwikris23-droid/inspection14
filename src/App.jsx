@@ -67,11 +67,11 @@ const INITIAL_PRODUCT_TEMPLATES = [
     defaultQ: 1,
     unitDim: 'cm',
     bomFormulas: [
-      { id: 'M1', name: 'Kain RBO01 Blackout', unit: 'm²', formula: '((L-3)*(T+25))/10000', tolerancePct: 3, note: 'Potongan kain utama + overlap gulungan' },
+      { id: 'M1', name: 'Kain RBO01 Blackout', unit: 'm²', formula: '(((L-3)*(T+25))/10000) * Q', tolerancePct: 3, note: 'Potongan kain utama + overlap gulungan' },
       { id: 'M2', name: 'Tube Aluminium 38mm', unit: 'cm', formula: 'L - 3', tolerancePct: 2, note: 'Pipa roll atas' },
       { id: 'M3', name: 'Headrail Profile Top', unit: 'cm', formula: 'L - 3', tolerancePct: 2, note: 'Rel pembungkus atas' },
       { id: 'M4', name: 'Bottom Rail Heavy Duty', unit: 'cm', formula: 'L - 3', tolerancePct: 2, note: 'Pemberat bagian bawah' },
-      { id: 'M5', name: 'Roller Mechanism Set', unit: 'Set', formula: '1', tolerancePct: 0, note: 'Mekanisme rantai dan spring' },
+      { id: 'M5', name: 'Roller Mechanism Set', unit: 'Set', formula: '1 * Q', tolerancePct: 0, note: 'Mekanisme rantai dan spring' },
       { id: 'M6', name: 'Bracket Mounting', unit: 'Pcs', formula: 'L > 180 ? 4 : (L >= 120 ? 3 : 2)', tolerancePct: 0, note: 'Ternary 3 kondisi L' },
       { id: 'M7', name: 'Chain Tarikan Nylon', unit: 'cm', formula: '(T * 2) - 20', tolerancePct: 5, note: 'Panjang keliling rantai' },
     ],
@@ -92,11 +92,11 @@ const INITIAL_PRODUCT_TEMPLATES = [
     defaultQ: 1,
     unitDim: 'cm',
     bomFormulas: [
-      { id: 'M1', name: 'Kain Zebra Stripe Dual', unit: 'm²', formula: '((L-3)*(T*2+30))/10000', tolerancePct: 3, note: 'Dual layer fabric formula' },
+      { id: 'M1', name: 'Kain Zebra Stripe Dual', unit: 'm²', formula: '(((L-3)*(T*2+30))/10000) * Q', tolerancePct: 3, note: 'Dual layer fabric formula' },
       { id: 'M2', name: 'Tube Aluminium Zebra 38mm', unit: 'cm', formula: 'L - 3', tolerancePct: 2, note: 'Pipa atas Zebra' },
       { id: 'M3', name: 'Cassette Cover Box', unit: 'cm', formula: 'L - 1', tolerancePct: 2, note: 'Box penutup zebra' },
       { id: 'M4', name: 'Bottom Roller Tube', unit: 'cm', formula: 'L - 3', tolerancePct: 2, note: 'Rel bawah double' },
-      { id: 'M5', name: 'Zebra Mechanism Kit', unit: 'Set', formula: '1', tolerancePct: 0, note: 'Mekanisme putar zebra' },
+      { id: 'M5', name: 'Zebra Mechanism Kit', unit: 'Set', formula: '1 * Q', tolerancePct: 0, note: 'Mekanisme putar zebra' },
       { id: 'M6', name: 'Bracket Cassette', unit: 'Pcs', formula: 'L > 140 ? 3 : 2', tolerancePct: 0, note: 'Bracket gantung box' },
     ],
     soDimensionSpecs: [
@@ -237,6 +237,7 @@ export default function App() {
     }
   }, [selectedProductTemplateId, currentTemplate]);
 
+  // KALKULASI BOM TARGET PERBAIKAN (Q hanya berlaku jika tertulis eksplisit di rumus)
   const calculatedTargetBom = useMemo(() => {
     if (!currentTemplate || !currentTemplate.bomFormulas) return [];
     const params = {
@@ -247,13 +248,12 @@ export default function App() {
     };
 
     return currentTemplate.bomFormulas.map((item) => {
+      // Evaluasi rumus secara murni
       const baseQty = evaluateFormula(item.formula, params);
-      const isQMultiplied = String(item.formula).toUpperCase().includes('Q');
-      const totalTarget = isQMultiplied ? baseQty : baseQty * params.Q;
 
       return {
         ...item,
-        calculatedQty: parseFloat(totalTarget.toFixed(3)),
+        calculatedQty: parseFloat(baseQty.toFixed(3)),
         formulaText: item.formula,
       };
     });
