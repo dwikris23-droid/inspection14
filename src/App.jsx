@@ -147,7 +147,7 @@ export default function App() {
   const [soNumberInput, setSoNumberInput] = useState('SO-CUST-88102');
   const [customerInput, setCustomerInput] = useState('PT Decor Minimalis Indonesia');
   const [shiftInput, setShiftInput] = useState('Shift 1 - Pagi');
-  const [inspectorInput, setInspectorInput] = useState('Zein (QC Inspector)');
+  const [inspectorInput, setInspectorInput] = useState('Ahmad Zaky (QC Inspector)');
 
   const [dimL, setDimL] = useState(120);
   const [dimT, setDimT] = useState(200);
@@ -388,7 +388,7 @@ export default function App() {
         autoReason =
           'Pemakaian bahan baku aktual menyimpang jauh dari standar kalkulasi BoM formula.';
       } else {
-        recommendedStatus = 'TOLERANCE';
+        recommendedStatus = 'CONDITIONAL';
         autoReason =
           'Dimensi produk sesuai, namun terdapat deviasi kecil pada konsumsi bahan baku. Butuh persetujuan supervisor.';
       }
@@ -641,7 +641,7 @@ export default function App() {
     if (totalInspections === 0) return null;
 
     const passCount = filteredForSummary.filter((i) => i.overallStatus === 'PASS').length;
-    const toleranceCount = filteredForSummary.filter((i) => i.overallStatus === 'TOLERANCE').length;
+    const conditionalCount = filteredForSummary.filter((i) => i.overallStatus === 'CONDITIONAL').length;
     const rejectCount = filteredForSummary.filter((i) => i.overallStatus === 'REJECT').length;
     const passRate = ((passCount / totalInspections) * 100).toFixed(1);
 
@@ -700,17 +700,17 @@ export default function App() {
     const defaultShifts = ['Shift 1 - Pagi', 'Shift 2 - Siang', 'Shift 3 - Malam'];
     const shiftMap = {};
     defaultShifts.forEach(s => {
-      shiftMap[s] = { shift: s, total: 0, pass: 0, tolerance: 0, reject: 0, passRate: '0.0' };
+      shiftMap[s] = { shift: s, total: 0, pass: 0, conditional: 0, reject: 0, passRate: '0.0' };
     });
 
     filteredForSummary.forEach((r) => {
       const s = r.shift || 'Shift 1 - Pagi';
       if (!shiftMap[s]) {
-        shiftMap[s] = { shift: s, total: 0, pass: 0, tolerance: 0, reject: 0, passRate: '0.0' };
+        shiftMap[s] = { shift: s, total: 0, pass: 0, conditional: 0, reject: 0, passRate: '0.0' };
       }
       shiftMap[s].total += 1;
       if (r.overallStatus === 'PASS') shiftMap[s].pass += 1;
-      if (r.overallStatus === 'TOLERANCE') shiftMap[s].tolerance += 1;
+      if (r.overallStatus === 'CONDITIONAL') shiftMap[s].conditional += 1;
       if (r.overallStatus === 'REJECT') shiftMap[s].reject += 1;
     });
 
@@ -724,7 +724,7 @@ export default function App() {
     return {
       totalInspections,
       passCount,
-      toleranceCount,
+      conditionalCount,
       rejectCount,
       passRate,
       aggregatedMaterials,
@@ -759,9 +759,9 @@ export default function App() {
     });
 
     csvContent += "\n";
-    csvContent += "SHIFT KERJA,TOTAL INSPEKSI,PASS,TOLERANCE,REJECT,PASS RATE (%)\n";
+    csvContent += "SHIFT KERJA,TOTAL INSPEKSI,PASS,CONDITIONAL,REJECT,PASS RATE (%)\n";
     summaryMetrics.shiftData.forEach((s) => {
-      csvContent += `"${s.shift}",${s.total},${s.pass},${s.tolerance},${s.reject},${s.passRate}%\n`;
+      csvContent += `"${s.shift}",${s.total},${s.pass},${s.conditional},${s.reject},${s.passRate}%\n`;
     });
 
     const encodedUri = encodeURI(csvContent);
@@ -1372,7 +1372,7 @@ export default function App() {
                           </div>
                           <div className="flex space-x-2 text-xs font-bold font-mono">
                             <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 rounded-lg border border-emerald-500/30">PASS: {s.pass}</span>
-                            <span className="px-2.5 py-1 bg-amber-500/20 text-amber-300 rounded-lg border border-amber-500/30">COND: {s.tolerance}</span>
+                            <span className="px-2.5 py-1 bg-amber-500/20 text-amber-300 rounded-lg border border-amber-500/30">COND: {s.conditional}</span>
                             <span className="px-2.5 py-1 bg-rose-500/20 text-rose-300 rounded-lg border border-rose-500/30">REJ: {s.reject}</span>
                           </div>
                         </div>
@@ -1475,9 +1475,9 @@ export default function App() {
 
                         <div className="flex justify-between items-center bg-slate-900/60 p-2.5 rounded-lg border border-slate-700/60">
                           <span className="text-slate-300 flex items-center gap-1.5 font-semibold">
-                            <AlertTriangle className="w-4 h-4 text-amber-400" /> Tolerance
+                            <AlertTriangle className="w-4 h-4 text-amber-400" /> Conditional
                           </span>
-                          <span className="font-bold font-mono text-amber-400 text-sm">{shiftInfo.tolerance}</span>
+                          <span className="font-bold font-mono text-amber-400 text-sm">{shiftInfo.conditional}</span>
                         </div>
 
                         <div className="flex justify-between items-center bg-slate-900/60 p-2.5 rounded-lg border border-slate-700/60">
@@ -1514,7 +1514,7 @@ export default function App() {
                 <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-semibold focus:outline-none">
                   <option value="ALL">Semua Status</option>
                   <option value="PASS">PASS (Lulus)</option>
-                  <option value="TOLERANCE">TOLERANCE</option>
+                  <option value="CONDITIONAL">CONDITIONAL</option>
                   <option value="REJECT">REJECT (Cacat)</option>
                 </select>
               </div>
