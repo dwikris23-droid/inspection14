@@ -947,7 +947,7 @@ export default function App() {
                     )}
 
                     <div>
-                      <label className="text-xs font-bold text-emerald-400 block mb-1">Jumlah / Qty Order</label>
+                      <label className="text-xs font-bold text-emerald-400 block mb-1">Pannel</label>
                       <input type="number" value={dimQ} onChange={(e) => setDimQ(e.target.value)} className="w-full bg-slate-800 border-2 border-emerald-500/60 rounded-lg px-3 py-2 font-mono text-lg text-white font-bold focus:outline-none" required />
                     </div>
                   </div>
