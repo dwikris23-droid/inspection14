@@ -147,7 +147,7 @@ export default function App() {
   const [soNumberInput, setSoNumberInput] = useState('SO-CUST-88102');
   const [customerInput, setCustomerInput] = useState('PT Decor Minimalis Indonesia');
   const [shiftInput, setShiftInput] = useState('Shift 1 - Pagi');
-  const [inspectorInput, setInspectorInput] = useState('Ahmad Zaky (QC Inspector)');
+  const [inspectorInput, setInspectorInput] = useState('Zein (QC Inspector)');
 
   const [dimL, setDimL] = useState(120);
   const [dimT, setDimT] = useState(200);
