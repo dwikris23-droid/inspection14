@@ -48,18 +48,18 @@ const evaluateFormula = (formulaStr, params) => {
       .replace(/\bfloor\b/gi, 'Math.floor')
       .replace(/\bround\b/gi, 'Math.round');
 
-    // 2. Substitusi variabel secara presisi (menggunakan word boundary agar Math.ceil aman dari huruf L)
+    // 2. Substitusi variabel secara presisi
     expr = expr
       .replace(/\bL\b/g, L)
       .replace(/\bT\b/g, T)
       .replace(/\bP\b/g, P)
       .replace(/\bQ\b/g, Q);
 
-    // 3. Sanitasi karakter yang diperbolehkan (termasuk huruf a-zA-Z untuk fungsi Math)
+    // 3. Sanitasi karakter yang diperbolehkan
     const sanitized = expr.replace(/[^0-9\.\+\-\*\/\(\)\s\>\<\?\:\,\%a-zA-Z]/g, '');
     if (!sanitized.trim()) return 0;
 
-    // 4. Eksekusi fungsi menggunakan scope Math bawaan JS secara alami
+    // 4. Eksekusi fungsi menggunakan scope Math bawaan JS
     const result = new Function(`return (${sanitized});`)();
     return isNaN(result) || !isFinite(result) ? 0 : Math.max(0, result);
   } catch (err) {
@@ -161,6 +161,8 @@ export default function App() {
   const [inspectionNotes, setInspectionNotes] = useState('');
 
   const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
+
+  // ✅ Diberi penambahan default S2: Tinggi Akhir (T)
   const [newProductForm, setNewProductForm] = useState({
     id: '',
     name: '',
@@ -175,6 +177,7 @@ export default function App() {
     ],
     soDimensionSpecs: [
       { id: 'S1', name: 'Lebar Akhir (L)', targetFormula: 'L', minTol: -0.2, maxTol: 0.2, unit: 'cm' },
+      { id: 'S2', name: 'Tinggi Akhir (T)', targetFormula: 'T', minTol: -0.5, maxTol: 0.5, unit: 'cm' },
     ],
     estWasteStandardPct: 3.0,
   });
@@ -249,7 +252,7 @@ export default function App() {
     }
   }, [selectedProductTemplateId, currentTemplate]);
 
-  // KALKULASI BOM TARGET PERBAIKAN (Q hanya berlaku jika tertulis eksplisit di rumus)
+  // KALKULASI BOM TARGET PERBAIKAN
   const calculatedTargetBom = useMemo(() => {
     if (!currentTemplate || !currentTemplate.bomFormulas) return [];
     const params = {
@@ -260,7 +263,6 @@ export default function App() {
     };
 
     return currentTemplate.bomFormulas.map((item) => {
-      // Evaluasi rumus secara murni
       const baseQty = evaluateFormula(item.formula, params);
 
       return {
@@ -271,8 +273,20 @@ export default function App() {
     });
   }, [currentTemplate, dimL, dimT, dimP, dimQ]);
 
+  // KALKULASI TARGET SPECS (MENGHASILKAN L DAN T)
   const calculatedTargetSpecs = useMemo(() => {
-    if (!currentTemplate || !currentTemplate.soDimensionSpecs) return [];
+    if (!currentTemplate) return [];
+
+    // ✅ JIKA S3/S2 TDK ADA DI TEMPLATE, FALLBACK TAMPILKAN SETIDAKNYA LEBAR & TINGGI
+    const defaultSpecs = [
+      { id: 'S1', name: 'Lebar Akhir (L)', targetFormula: 'L', minTol: -0.2, maxTol: 0.2, unit: currentTemplate.unitDim || 'cm' },
+      { id: 'S2', name: 'Tinggi Akhir (T)', targetFormula: 'T', minTol: -0.5, maxTol: 0.5, unit: currentTemplate.unitDim || 'cm' },
+    ];
+
+    const specsToEvaluate = (currentTemplate.soDimensionSpecs && currentTemplate.soDimensionSpecs.length > 0)
+      ? currentTemplate.soDimensionSpecs
+      : defaultSpecs;
+
     const params = {
       L: parseFloat(dimL) || 0,
       T: parseFloat(dimT) || 0,
@@ -280,7 +294,7 @@ export default function App() {
       Q: parseFloat(dimQ) || 1,
     };
 
-    return currentTemplate.soDimensionSpecs.map((spec) => {
+    return specsToEvaluate.map((spec) => {
       const targetVal = evaluateFormula(spec.targetFormula, params);
       return {
         ...spec,
@@ -515,6 +529,7 @@ export default function App() {
         ],
         soDimensionSpecs: [
           { id: 'S1', name: 'Lebar Akhir (L)', targetFormula: 'L', minTol: -0.2, maxTol: 0.2, unit: 'cm' },
+          { id: 'S2', name: 'Tinggi Akhir (T)', targetFormula: 'T', minTol: -0.5, maxTol: 0.5, unit: 'cm' },
         ],
         estWasteStandardPct: 3.0,
       });
@@ -596,6 +611,67 @@ export default function App() {
         bomFormulas: updatedBom,
       });
       showToast('Baris bahan dihapus dari Firebase!');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // TAMBAH BARIS DIMENSI SO BARU KE FIREBASE
+  const handleAddSoSpecRow = async (tmplId) => {
+    const tmpl = productTemplates.find((p) => p.id === tmplId);
+    if (!tmpl) return;
+
+    const newSpec = {
+      id: `S${(tmpl.soDimensionSpecs?.length || 0) + 1}`,
+      name: 'Parameter Dimensi Baru',
+      targetFormula: 'T',
+      minTol: -0.5,
+      maxTol: 0.5,
+      unit: tmpl.unitDim || 'cm',
+    };
+
+    try {
+      await updateDoc(doc(db, 'product_templates', tmplId), {
+        soDimensionSpecs: [...(tmpl.soDimensionSpecs || []), newSpec],
+      });
+      showToast('Spesifikasi dimensi baru disimpan ke Firebase!');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // UPDATE BARIS DIMENSI SO DI FIREBASE
+  const handleUpdateSoSpecItem = async (tmplId, specId, updatedField, value) => {
+    const tmpl = productTemplates.find((p) => p.id === tmplId);
+    if (!tmpl) return;
+
+    const updatedSpecs = tmpl.soDimensionSpecs.map((s) => {
+      if (s.id !== specId) return s;
+      return { ...s, [updatedField]: value };
+    });
+
+    try {
+      await updateDoc(doc(db, 'product_templates', tmplId), {
+        soDimensionSpecs: updatedSpecs,
+      });
+      showToast('Spesifikasi dimensi diperbarui!');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // HAPUS BARIS DIMENSI SO DARI FIREBASE
+  const handleDeleteSoSpecRow = async (tmplId, specId) => {
+    const tmpl = productTemplates.find((p) => p.id === tmplId);
+    if (!tmpl) return;
+
+    const updatedSpecs = tmpl.soDimensionSpecs.filter((s) => s.id !== specId);
+
+    try {
+      await updateDoc(doc(db, 'product_templates', tmplId), {
+        soDimensionSpecs: updatedSpecs,
+      });
+      showToast('Spesifikasi dimensi dihapus!');
     } catch (err) {
       console.error(err);
     }
@@ -1584,7 +1660,7 @@ export default function App() {
 
             <div className="space-y-6">
               {productTemplates.map((tmpl) => (
-                <div key={tmpl.id} className="p-6 rounded-2xl bg-slate-800 border border-slate-700 space-y-4">
+                <div key={tmpl.id} className="p-6 rounded-2xl bg-slate-800 border border-slate-700 space-y-6">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-700 pb-3 gap-2">
                     <div>
                       <div className="flex items-center space-x-2">
@@ -1604,45 +1680,100 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-900/80 text-slate-400 uppercase border-b border-slate-700">
-                        <tr>
-                          <th className="py-2.5 px-3">Nama Bahan</th>
-                          <th className="py-2.5 px-3">Satuan</th>
-                          <th className="py-2.5 px-3">Rumus Formula Custom (L, T, P, Q)</th>
-                          <th className="py-2.5 px-3 w-28">Toleransi (%)</th>
-                          <th className="py-2.5 px-3">Catatan Potong / Perakitan</th>
-                          <th className="py-2.5 px-3 text-right">Aksi</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-700/60 font-mono">
-                        {tmpl.bomFormulas?.map((f) => (
-                          <tr key={f.id} className="hover:bg-slate-750">
-                            <td className="py-2.5 px-3 font-sans">
-                              <input type="text" value={f.name} onChange={(e) => handleUpdateFormulaItem(tmpl.id, f.id, 'name', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs font-semibold focus:border-indigo-500" />
-                            </td>
-                            <td className="py-2.5 px-3 font-sans">
-                              <input type="text" value={f.unit} onChange={(e) => handleUpdateFormulaItem(tmpl.id, f.id, 'unit', e.target.value)} className="w-20 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-indigo-300 text-xs font-bold focus:border-indigo-500" />
-                            </td>
-                            <td className="py-2.5 px-3">
-                              <input type="text" value={f.formula} onChange={(e) => handleUpdateFormulaItem(tmpl.id, f.id, 'formula', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-emerald-400 font-mono text-xs focus:border-indigo-500" />
-                            </td>
-                            <td className="py-2.5 px-3">
-                              <input type="number" value={f.tolerancePct} onChange={(e) => handleUpdateFormulaItem(tmpl.id, f.id, 'tolerancePct', parseFloat(e.target.value) || 0)} className="w-16 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs text-center focus:border-indigo-500" />
-                            </td>
-                            <td className="py-2.5 px-3 font-sans">
-                              <input type="text" value={f.note} onChange={(e) => handleUpdateFormulaItem(tmpl.id, f.id, 'note', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-300 text-xs focus:border-indigo-500" />
-                            </td>
-                            <td className="py-2.5 px-3 text-right">
-                              <button onClick={() => handleDeleteFormulaRow(tmpl.id, f.id)} className="p-1 bg-rose-500/20 text-rose-300 hover:bg-rose-600 hover:text-white rounded transition-all" title="Hapus Baris Komponen">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </td>
+                  {/* 1. EDITOR BOM FORMULA */}
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold uppercase text-indigo-400">1. Resep BoM Komponen / Bahan Baku</h4>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-900/80 text-slate-400 uppercase border-b border-slate-700">
+                          <tr>
+                            <th className="py-2.5 px-3">Nama Bahan</th>
+                            <th className="py-2.5 px-3">Satuan</th>
+                            <th className="py-2.5 px-3">Rumus Formula Custom (L, T, P, Q)</th>
+                            <th className="py-2.5 px-3 w-28">Toleransi (%)</th>
+                            <th className="py-2.5 px-3">Catatan Potong / Perakitan</th>
+                            <th className="py-2.5 px-3 text-right">Aksi</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody className="divide-y divide-slate-700/60 font-mono">
+                          {tmpl.bomFormulas?.map((f) => (
+                            <tr key={f.id} className="hover:bg-slate-750">
+                              <td className="py-2.5 px-3 font-sans">
+                                <input type="text" value={f.name} onChange={(e) => handleUpdateFormulaItem(tmpl.id, f.id, 'name', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs font-semibold focus:border-indigo-500" />
+                              </td>
+                              <td className="py-2.5 px-3 font-sans">
+                                <input type="text" value={f.unit} onChange={(e) => handleUpdateFormulaItem(tmpl.id, f.id, 'unit', e.target.value)} className="w-20 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-indigo-300 text-xs font-bold focus:border-indigo-500" />
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <input type="text" value={f.formula} onChange={(e) => handleUpdateFormulaItem(tmpl.id, f.id, 'formula', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-emerald-400 font-mono text-xs focus:border-indigo-500" />
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <input type="number" value={f.tolerancePct} onChange={(e) => handleUpdateFormulaItem(tmpl.id, f.id, 'tolerancePct', parseFloat(e.target.value) || 0)} className="w-16 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs text-center focus:border-indigo-500" />
+                              </td>
+                              <td className="py-2.5 px-3 font-sans">
+                                <input type="text" value={f.note} onChange={(e) => handleUpdateFormulaItem(tmpl.id, f.id, 'note', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-300 text-xs focus:border-indigo-500" />
+                              </td>
+                              <td className="py-2.5 px-3 text-right">
+                                <button onClick={() => handleDeleteFormulaRow(tmpl.id, f.id)} className="p-1 bg-rose-500/20 text-rose-300 hover:bg-rose-600 hover:text-white rounded transition-all" title="Hapus Baris Komponen">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* 2. EDITOR DIMENSI SPESIFIKASI SO */}
+                  <div className="space-y-2 pt-2 border-t border-slate-700/60">
+                    <div className="flex justify-between items-center">
+                      <h4 className="text-xs font-bold uppercase text-emerald-400">2. Parameter Spesifikasi Ukuran Hasil Kerja (QC SO)</h4>
+                      <button onClick={() => handleAddSoSpecRow(tmpl.id)} className="text-[11px] bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white px-2.5 py-1 rounded font-bold border border-indigo-500/30 flex items-center gap-1 transition-all">
+                        <Plus className="w-3 h-3" /> Tambah Parameter Ukur SO
+                      </button>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-900/80 text-slate-400 uppercase border-b border-slate-700">
+                          <tr>
+                            <th className="py-2.5 px-3">Nama Dimensi</th>
+                            <th className="py-2.5 px-3">Formula Target (L, T, P)</th>
+                            <th className="py-2.5 px-3 w-28">Toleransi Min</th>
+                            <th className="py-2.5 px-3 w-28">Toleransi Max</th>
+                            <th className="py-2.5 px-3 w-20">Satuan</th>
+                            <th className="py-2.5 px-3 text-right">Aksi</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-700/60 font-mono">
+                          {tmpl.soDimensionSpecs?.map((spec) => (
+                            <tr key={spec.id} className="hover:bg-slate-750">
+                              <td className="py-2.5 px-3 font-sans">
+                                <input type="text" value={spec.name} onChange={(e) => handleUpdateSoSpecItem(tmpl.id, spec.id, 'name', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs font-semibold focus:border-indigo-500" />
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <input type="text" value={spec.targetFormula} onChange={(e) => handleUpdateSoSpecItem(tmpl.id, spec.id, 'targetFormula', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-emerald-400 font-mono text-xs focus:border-indigo-500" />
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <input type="number" step="any" value={spec.minTol} onChange={(e) => handleUpdateSoSpecItem(tmpl.id, spec.id, 'minTol', parseFloat(e.target.value) || 0)} className="w-20 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs text-center focus:border-indigo-500" />
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <input type="number" step="any" value={spec.maxTol} onChange={(e) => handleUpdateSoSpecItem(tmpl.id, spec.id, 'maxTol', parseFloat(e.target.value) || 0)} className="w-20 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs text-center focus:border-indigo-500" />
+                              </td>
+                              <td className="py-2.5 px-3 font-sans">
+                                <input type="text" value={spec.unit} onChange={(e) => handleUpdateSoSpecItem(tmpl.id, spec.id, 'unit', e.target.value)} className="w-16 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-indigo-300 text-xs font-bold focus:border-indigo-500" />
+                              </td>
+                              <td className="py-2.5 px-3 text-right">
+                                <button onClick={() => handleDeleteSoSpecRow(tmpl.id, spec.id)} className="p-1 bg-rose-500/20 text-rose-300 hover:bg-rose-600 hover:text-white rounded transition-all" title="Hapus Baris Ukuran SO">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
               ))}
