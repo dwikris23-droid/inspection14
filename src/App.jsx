@@ -48,7 +48,7 @@ const evaluateFormula = (formulaStr, params) => {
       .replace(/\bfloor\b/gi, 'Math.floor')
       .replace(/\bround\b/gi, 'Math.round');
 
-    // 2. Substitusi variabel secara presisi
+    // 2. Substitusi variabel secara presisi (menggunakan word boundary agar Math.ceil aman)
     expr = expr
       .replace(/\bL\b/g, L)
       .replace(/\bT\b/g, T)
@@ -59,7 +59,7 @@ const evaluateFormula = (formulaStr, params) => {
     const sanitized = expr.replace(/[^0-9\.\+\-\*\/\(\)\s\>\<\?\:\,\%a-zA-Z]/g, '');
     if (!sanitized.trim()) return 0;
 
-    // 4. Eksekusi fungsi menggunakan scope Math bawaan JS
+    // 4. Eksekusi fungsi menggunakan scope Math bawaan JS secara alami
     const result = new Function(`return (${sanitized});`)();
     return isNaN(result) || !isFinite(result) ? 0 : Math.max(0, result);
   } catch (err) {
@@ -162,7 +162,6 @@ export default function App() {
 
   const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
 
-  // ✅ Diberi penambahan default S2: Tinggi Akhir (T)
   const [newProductForm, setNewProductForm] = useState({
     id: '',
     name: '',
@@ -198,7 +197,6 @@ export default function App() {
         }));
 
         if (fetchedTemplates.length === 0) {
-          // Jika di Firebase masih kosong, upload template default awal
           INITIAL_PRODUCT_TEMPLATES.forEach(async (tmpl) => {
             await setDoc(doc(db, 'product_templates', tmpl.id), tmpl);
           });
@@ -252,7 +250,7 @@ export default function App() {
     }
   }, [selectedProductTemplateId, currentTemplate]);
 
-  // KALKULASI BOM TARGET PERBAIKAN
+  // KALKULASI BOM TARGET
   const calculatedTargetBom = useMemo(() => {
     if (!currentTemplate || !currentTemplate.bomFormulas) return [];
     const params = {
@@ -273,19 +271,16 @@ export default function App() {
     });
   }, [currentTemplate, dimL, dimT, dimP, dimQ]);
 
-  // KALKULASI TARGET SPECS (MENGHASILKAN L DAN T)
+  // KALKULASI TARGET SPECS (MENGHITUNG SEMUA ITEM DARI FIREBASE / DEFAULT)
   const calculatedTargetSpecs = useMemo(() => {
     if (!currentTemplate) return [];
 
-    // ✅ JIKA S3/S2 TDK ADA DI TEMPLATE, FALLBACK TAMPILKAN SETIDAKNYA LEBAR & TINGGI
-    const defaultSpecs = [
-      { id: 'S1', name: 'Lebar Akhir (L)', targetFormula: 'L', minTol: -0.2, maxTol: 0.2, unit: currentTemplate.unitDim || 'cm' },
-      { id: 'S2', name: 'Tinggi Akhir (T)', targetFormula: 'T', minTol: -0.5, maxTol: 0.5, unit: currentTemplate.unitDim || 'cm' },
-    ];
-
     const specsToEvaluate = (currentTemplate.soDimensionSpecs && currentTemplate.soDimensionSpecs.length > 0)
       ? currentTemplate.soDimensionSpecs
-      : defaultSpecs;
+      : [
+          { id: 'S1', name: 'Lebar Akhir (L)', targetFormula: 'L', minTol: -0.2, maxTol: 0.2, unit: currentTemplate.unitDim || 'cm' },
+          { id: 'S2', name: 'Tinggi Akhir (T)', targetFormula: 'T', minTol: -0.5, maxTol: 0.5, unit: currentTemplate.unitDim || 'cm' },
+        ];
 
     const params = {
       L: parseFloat(dimL) || 0,
@@ -303,6 +298,7 @@ export default function App() {
     });
   }, [currentTemplate, dimL, dimT, dimP, dimQ]);
 
+  // SINKRONISASI DATA DEFAULTS STEP 2 (DIPERBAIKI SECARA FULL SEHINGGA BEBAS BUG STATE)
   const syncDefaultsForStep2 = () => {
     const defaultBomActuals = {};
     calculatedTargetBom.forEach((item) => {
@@ -555,7 +551,7 @@ export default function App() {
     }
   };
 
-  // EDIT BARIS FORMULA BOMI LANGSUNG DI FIREBASE
+  // EDIT BARIS FORMULA BOM LANGSUNG DI FIREBASE
   const handleUpdateFormulaItem = async (tmplId, formulaId, updatedField, value) => {
     const tmpl = productTemplates.find((p) => p.id === tmplId);
     if (!tmpl) return;
@@ -1233,7 +1229,7 @@ export default function App() {
                             <td className="py-3 px-3 font-mono text-indigo-300 font-bold">{item.target} {item.unit}</td>
                             <td className="py-3 px-3 font-mono text-slate-400 text-[11px]">{item.minAllowed} s/d {item.maxAllowed} {item.unit}</td>
                             <td className="py-3 px-3">
-                              <input type="number" step="any" value={actualDimensionsMeasured[item.specId] || ''} onChange={(e) => setActualDimensionsMeasured({ ...actualDimensionsMeasured, [item.specId]: e.target.value })} className="w-full bg-slate-900 border border-slate-700 focus:border-indigo-500 rounded px-2.5 py-1.5 font-mono text-white text-sm font-bold" required />
+                              <input type="number" step="any" value={actualDimensionsMeasured[item.specId] !== undefined ? actualDimensionsMeasured[item.specId] : item.target} onChange={(e) => setActualDimensionsMeasured({ ...actualDimensionsMeasured, [item.specId]: e.target.value })} className="w-full bg-slate-900 border border-slate-700 focus:border-indigo-500 rounded px-2.5 py-1.5 font-mono text-white text-sm font-bold" required />
                             </td>
                             <td className="py-3 px-3">
                               {item.status === 'PASS' ? (
