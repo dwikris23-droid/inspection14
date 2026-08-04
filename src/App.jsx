@@ -35,17 +35,23 @@ import {
   Download,
 } from 'lucide-react';
 
-// Evaluator Formula Dinamis
+// Evaluator Formula Dinamis (Updated with Math Support)
 const evaluateFormula = (formulaStr, params) => {
   try {
     const { L = 0, T = 0, P = 0, Q = 1 } = params;
     let expr = String(formulaStr)
+      // Konversi otomatis fungsi matematika dasar
+      .replace(/\bceil\b/gi, 'Math.ceil')
+      .replace(/\bfloor\b/gi, 'Math.floor')
+      .replace(/\bround\b/gi, 'Math.round')
+      // Substitusi variabel
       .replace(/\bL\b/gi, L)
       .replace(/\bT\b/gi, T)
       .replace(/\bP\b/gi, P)
       .replace(/\bQ\b/gi, Q);
 
-    const sanitized = expr.replace(/[^0-9\.\+\-\*\/\(\)\s\>\<\?\:\,\%]/g, '');
+    // Mengizinkan huruf (a-zA-Z) agar nama fungsi Math.* tidak terhapus
+    const sanitized = expr.replace(/[^0-9\.\+\-\*\/\(\)\s\>\<\?\:\,\%a-zA-Z]/g, '');
     if (!sanitized.trim()) return 0;
 
     const result = new Function('Math', `return (${sanitized});`)(Math);
