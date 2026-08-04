@@ -35,26 +35,32 @@ import {
   Download,
 } from 'lucide-react';
 
-// Evaluator Formula Dinamis (Updated with Math Support)
+// Evaluator Formula Dinamis (FIXED: Math & Variable Substitution Order)
 const evaluateFormula = (formulaStr, params) => {
   try {
     const { L = 0, T = 0, P = 0, Q = 1 } = params;
-    let expr = String(formulaStr)
-      // Konversi otomatis fungsi matematika dasar
+    
+    let expr = String(formulaStr);
+
+    // 1. Normalisasi fungsi matematika tanpa merusak nama variabel
+    expr = expr
       .replace(/\bceil\b/gi, 'Math.ceil')
       .replace(/\bfloor\b/gi, 'Math.floor')
-      .replace(/\bround\b/gi, 'Math.round')
-      // Substitusi variabel
-      .replace(/\bL\b/gi, L)
-      .replace(/\bT\b/gi, T)
-      .replace(/\bP\b/gi, P)
-      .replace(/\bQ\b/gi, Q);
+      .replace(/\bround\b/gi, 'Math.round');
 
-    // Mengizinkan huruf (a-zA-Z) agar nama fungsi Math.* tidak terhapus
+    // 2. Substitusi variabel secara presisi (menggunakan word boundary agar Math.ceil aman dari huruf L)
+    expr = expr
+      .replace(/\bL\b/g, L)
+      .replace(/\bT\b/g, T)
+      .replace(/\bP\b/g, P)
+      .replace(/\bQ\b/g, Q);
+
+    // 3. Sanitasi karakter yang diperbolehkan (termasuk huruf a-zA-Z untuk fungsi Math)
     const sanitized = expr.replace(/[^0-9\.\+\-\*\/\(\)\s\>\<\?\:\,\%a-zA-Z]/g, '');
     if (!sanitized.trim()) return 0;
 
-    const result = new Function('Math', `return (${sanitized});`)(Math);
+    // 4. Eksekusi fungsi menggunakan scope Math bawaan JS secara alami
+    const result = new Function(`return (${sanitized});`)();
     return isNaN(result) || !isFinite(result) ? 0 : Math.max(0, result);
   } catch (err) {
     console.error('Formula evaluation error:', err);
