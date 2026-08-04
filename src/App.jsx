@@ -641,7 +641,7 @@ export default function App() {
     if (totalInspections === 0) return null;
 
     const passCount = filteredForSummary.filter((i) => i.overallStatus === 'PASS').length;
-    const conditionalCount = filteredForSummary.filter((i) => i.overallStatus === 'TOLERANCE').length;
+    const toleranceCount = filteredForSummary.filter((i) => i.overallStatus === 'TOLERANCE').length;
     const rejectCount = filteredForSummary.filter((i) => i.overallStatus === 'REJECT').length;
     const passRate = ((passCount / totalInspections) * 100).toFixed(1);
 
